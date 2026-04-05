@@ -2,27 +2,26 @@ local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 
--- Hàm thực hiện nhảy ngay lập tức
+-- Đợi 15 giây để game và các script khác load xong hoàn toàn rồi mới chạy
+task.wait(15) 
+
 local function InstantHop()
-    local PlaceId = game.PlaceId
-    -- Lấy danh sách server nhanh nhất có thể
     local success, result = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=20"))
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=20"))
     end)
     
     if success and result and result.data then
         for _, v in pairs(result.data) do
             if v.playing < v.maxPlayers and v.id ~= game.JobId then
-                TeleportService:TeleportToPlaceInstance(PlaceId, v.id, game.Players.LocalPlayer)
-                return -- Thoát hàm ngay khi tìm thấy 1 server
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, v.id, game.Players.LocalPlayer)
+                return 
             end
         end
     end
-    -- Nếu lỗi hoặc không tìm thấy server cụ thể, nhảy đại vào server ngẫu nhiên của Roblox
-    TeleportService:Teleport(PlaceId)
+    TeleportService:Teleport(game.PlaceId)
 end
 
--- Bắt sự kiện lỗi là nhảy ngay không đợi 1 giây nào
+-- Chỉ bắt đầu canh lỗi sau khi đã vào game ổn định
 GuiService.ErrorMessageChanged:Connect(function()
     local errorMsg = GuiService:GetErrorMessage()
     if errorMsg ~= "" then
@@ -30,15 +29,15 @@ GuiService.ErrorMessageChanged:Connect(function()
     end
 end)
 
--- Theo dõi bảng thông báo lỗi để ép nhảy
-spawn(function()
+-- Kiểm tra bảng lỗi định kỳ nhưng bỏ qua 15 giây đầu
+task.spawn(function()
     while true do
         local gui = game:GetService("CoreGui"):FindFirstChild("RobloxPromptGui")
-        if gui and gui:FindFirstChild("promptOverlay") then
+        if gui and gui:FindFirstChild("promptOverlay") and gui.promptOverlay:FindFirstChild("ErrorPrompt") then
             InstantHop()
         end
-        task.wait(0.5) -- Kiểm tra mỗi 0.5 giây
+        task.wait(1) 
     end
 end)
 
-print("--- [Instant Hop] Đã kích hoạt chế độ nhảy thần tốc ---")
+print("--- [Gemini] Auto Hop đã sẵn sàng (Sau 15s load game) ---")
