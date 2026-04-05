@@ -1,68 +1,65 @@
--- [[ ANTI-KICK & AUTO REJOIN V6 "IMMORTAL" - BY GEMINI ]]
-if not game:IsLoaded() then game.Loaded:Wait() end
+-- [[ INSTANT SERVER HOP V7 - BY GEMINI ]]
+repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+local GuiService = game:GetService("GuiService")
 
--- Hàm tìm Server cực vắng (Tránh lỗi Reconnect Unsuccessful)
-local function SafeHop()
-    local PlaceId = game.PlaceId
+-- Hàm lấy Server dự phòng sẵn trong bộ nhớ
+local function InstantHop()
     local success, result = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"))
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
     end)
     
-    if success and result and result.data then
-        local validServers = {}
-        for _, v in pairs(result.data) do
-            -- Chỉ chọn server còn trống ít nhất 5 chỗ (Cực kỳ an toàn)
-            if v.playing < (v.maxPlayers - 5) and v.id ~= game.JobId then
-                table.insert(validServers, v.id)
+    if success and result then
+        local targetServers = {}
+        for _, v in pairs(result) do
+            if v.playing < (v.maxPlayers - 2) and v.id ~= game.JobId then
+                table.insert(targetServers, v.id)
             end
         end
         
-        if #validServers > 0 then
-            local target = validServers[math.random(1, #validServers)]
-            TeleportService:TeleportToPlaceInstance(PlaceId, target, Players.LocalPlayer)
+        if #targetServers > 0 then
+            -- Nhảy ngay lập tức không delay
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetServers[math.random(1, #targetServers)], Players.LocalPlayer)
         else
-            TeleportService:Teleport(PlaceId)
+            TeleportService:Teleport(game.PlaceId)
         end
     end
 end
 
--- 1. CHẾ ĐỘ CỨU HỘ KHI HIỆN BẢNG LỖI (KICK/DISCONNECT)
+-- 1. NHẢY NGAY KHI CÓ THÔNG BÁO LỖI (KHÔNG ĐỢI GIÂY NÀO)
 GuiService.ErrorMessageChanged:Connect(function()
-    local msg = GuiService:GetErrorMessage()
-    if msg ~= "" then
-        print("Loi he thong: " .. msg .. ". Dang nghi 15s de xoa Cache...")
-        task.wait(15) -- Đợi 15s để server Roblox ghi nhận bạn đã thoát
-        SafeHop()
+    if GuiService:GetErrorMessage() ~= "" then
+        InstantHop()
     end
 end)
 
--- 2. CHẾ ĐỘ "NHỊP TIM" (PHÒNG TRƯỜNG HỢP GAME BỊ TREO IM KHÔNG HIỆN LỖI)
-task.spawn(function()
-    while task.wait(30) do -- Cứ 30 giây kiểm tra một lần
-        -- Nếu bạn ở trong server một mình quá lâu (lỗi server)
-        if #Players:GetPlayers() <= 1 then
-            SafeHop()
-        end
-    end
-end)
-
--- 3. TỰ ĐỘNG BẤM NÚT LỖI (DÀNH CHO EXECUTOR BỊ ĐƠ)
-local coreGui = game:GetService("CoreGui")
-coreGui.ChildAdded:Connect(function(child)
+-- 2. NHẢY NGAY KHI BẢNG LỖI XUẤT HIỆN TRONG GUI
+game:GetService("CoreGui").ChildAdded:Connect(function(child)
     if child.Name == "ErrorMessagePrompt" then
-        task.wait(5)
-        SafeHop()
+        InstantHop()
     end
 end)
 
--- 4. TỐI ƯU HÓA TREO MÁY (GIẢM LAG ĐỂ TRÁNH BỊ KICK DO QUÁ NHIỆT)
-if settings().Network.IncomingReplicationLag then
-    settings().Network.IncomingReplicationLag = 0
-end
+-- 3. NHẢY KHI SERVER VẮNG NGƯỜI (DƯỚI 2 NGƯỜI LÀ NHẢY LIỀN)
+Players.PlayerRemoving:Connect(function()
+    if #Players:GetPlayers() <= 2 then
+        InstantHop()
+    end
+end)
 
-print("--- [Gemini] V6 IMMORTAL: DA KICH HOAT. CHUC BAN TREO MAY NGON! ---")
+-- 4. TỰ ĐỘNG BẤM "LEAVE" TRONG CORE GUI ĐỂ ÉP GAME NHẢY
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
+            if prompt then
+                InstantHop()
+            end
+        end)
+    end
+end)
+
+print("--- [Gemini] V7 INSTANT: DA KICH HOAT ---")
