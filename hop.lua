@@ -1,76 +1,68 @@
--- [[ ANTI-DISCONNECT & ULTIMATE SERVER HOP V4 ]]
+-- [[ ANTI-KICK & AUTO REJOIN V6 "IMMORTAL" - BY GEMINI ]]
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local Players = game:GetService("Players")
 local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 
--- Chống lỗi đứng Script khi nhảy Server
-if syn and syn.queue_on_teleport then
-    syn.queue_on_teleport([[print("Dang tiep tuc thuc thi Script sau khi Hop...")]])
-elseif queue_on_teleport then
-    queue_on_teleport([[print("Dang tiep tuc thuc thi Script sau khi Hop...")]])
-end
-
-local function UltimateHop()
-    print("--- Dang tim kiem Server 'Sach' de tranh loi ket noi ---")
+-- Hàm tìm Server cực vắng (Tránh lỗi Reconnect Unsuccessful)
+local function SafeHop()
     local PlaceId = game.PlaceId
-    local Success, Servers = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+    local success, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"))
     end)
-
-    if Success and Servers then
-        local BestServers = {}
-        for _, v in pairs(Servers) do
-            -- Chỉ chọn server còn trống ít nhất 2 chỗ để tránh bị Full khi đang vào
-            if type(v) == "table" and v.playing < (v.maxPlayers - 2) and v.id ~= game.JobId then
-                table.insert(BestServers, v.id)
+    
+    if success and result and result.data then
+        local validServers = {}
+        for _, v in pairs(result.data) do
+            -- Chỉ chọn server còn trống ít nhất 5 chỗ (Cực kỳ an toàn)
+            if v.playing < (v.maxPlayers - 5) and v.id ~= game.JobId then
+                table.insert(validServers, v.id)
             end
         end
-
-        if #BestServers > 0 then
-            local Target = BestServers[math.random(1, #BestServers)]
-            -- Thủ thuật: Đợi 3 giây để xóa Cache phiên cũ trước khi thực hiện Teleport
-            task.wait(3)
-            TeleportService:TeleportToPlaceInstance(PlaceId, Target, Players.LocalPlayer)
+        
+        if #validServers > 0 then
+            local target = validServers[math.random(1, #validServers)]
+            TeleportService:TeleportToPlaceInstance(PlaceId, target, Players.LocalPlayer)
         else
-            -- Nếu không tìm được server vắng, nhảy đại vào server bất kỳ
-            TeleportService:Teleport(PlaceId, Players.LocalPlayer)
+            TeleportService:Teleport(PlaceId)
         end
     end
 end
 
--- BỘ LỌC LỖI TRIỆT ĐỂ
+-- 1. CHẾ ĐỘ CỨU HỘ KHI HIỆN BẢNG LỖI (KICK/DISCONNECT)
 GuiService.ErrorMessageChanged:Connect(function()
     local msg = GuiService:GetErrorMessage()
-    -- Bắt tất cả các loại lỗi: Kick, Disconnect, Internet, Teleport Failed
     if msg ~= "" then
-        warn("Loi he thong: " .. msg)
-        -- QUAN TRỌNG: Nghỉ 10 giây để Server Roblox xác nhận bạn đã Offline hoàn toàn
-        task.wait(10) 
-        UltimateHop()
+        print("Loi he thong: " .. msg .. ". Dang nghi 15s de xoa Cache...")
+        task.wait(15) -- Đợi 15s để server Roblox ghi nhận bạn đã thoát
+        SafeHop()
     end
 end)
 
--- AUTO RECONNECT NẾU GAME BỊ ĐỨNG (IDLE)
-spawn(function()
-    while task.wait(5) do
-        -- Nếu bị treo ở màn hình loading quá lâu
-        if #Players:GetPlayers() <= 1 and game.Loaded then
-            task.wait(5)
-            UltimateHop()
+-- 2. CHẾ ĐỘ "NHỊP TIM" (PHÒNG TRƯỜNG HỢP GAME BỊ TREO IM KHÔNG HIỆN LỖI)
+task.spawn(function()
+    while task.wait(30) do -- Cứ 30 giây kiểm tra một lần
+        -- Nếu bạn ở trong server một mình quá lâu (lỗi server)
+        if #Players:GetPlayers() <= 1 then
+            SafeHop()
         end
     end
 end)
 
--- Tự động bấm nút "Leave" hoặc "Reconnect" ngầm để kích hoạt Script
+-- 3. TỰ ĐỘNG BẤM NÚT LỖI (DÀNH CHO EXECUTOR BỊ ĐƠ)
 local coreGui = game:GetService("CoreGui")
 coreGui.ChildAdded:Connect(function(child)
     if child.Name == "ErrorMessagePrompt" then
-        task.wait(2)
-        UltimateHop()
+        task.wait(5)
+        SafeHop()
     end
 end)
 
-print("--- [Gemini] Ultimate Hop V4: DA KICH HOAT ---")
+-- 4. TỐI ƯU HÓA TREO MÁY (GIẢM LAG ĐỂ TRÁNH BỊ KICK DO QUÁ NHIỆT)
+if settings().Network.IncomingReplicationLag then
+    settings().Network.IncomingReplicationLag = 0
+end
+
+print("--- [Gemini] V6 IMMORTAL: DA KICH HOAT. CHUC BAN TREO MAY NGON! ---")
