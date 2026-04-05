@@ -27,7 +27,7 @@ end
 GuiService.ErrorMessageChanged:Connect(function()
     local errorPrompt = GuiService:GetErrorMessage()
     if errorPrompt ~= "" then
-        wait(5)
+        wait(15)
         ServerHop()
     end
 end)
