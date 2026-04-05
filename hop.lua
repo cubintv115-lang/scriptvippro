@@ -1,64 +1,44 @@
 local TeleportService = game:GetService("TeleportService")
-local Players = game:GetService("Players")
-local GuiService = game:GetService("GuiService")
 local HttpService = game:GetService("HttpService")
+local GuiService = game:GetService("GuiService")
 
--- Hàm nhảy Server thông minh
-local function SmartServerHop()
+-- Hàm thực hiện nhảy ngay lập tức
+local function InstantHop()
     local PlaceId = game.PlaceId
-    local servers = {}
-    
-    -- Thử lấy danh sách server 3 lần nếu bị lỗi mạng
-    local success, result
-    for i = 1, 3 do
-        success, result = pcall(function()
-            return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"))
-        end)
-        if success then break end
-        wait(2)
-    end
+    -- Lấy danh sách server nhanh nhất có thể
+    local success, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=20"))
+    end)
     
     if success and result and result.data then
         for _, v in pairs(result.data) do
-            -- Chỉ chọn server còn chỗ và không phải server vừa bị kick
             if v.playing < v.maxPlayers and v.id ~= game.JobId then
-                table.insert(servers, v.id)
+                TeleportService:TeleportToPlaceInstance(PlaceId, v.id, game.Players.LocalPlayer)
+                return -- Thoát hàm ngay khi tìm thấy 1 server
             end
         end
     end
-
-    if #servers > 0 then
-        -- Chọn ngẫu nhiên 1 server trong danh sách
-        local randomServer = servers[math.random(1, #servers)]
-        TeleportService:TeleportToPlaceInstance(PlaceId, randomServer, Players.LocalPlayer)
-    else
-        -- Nếu không tìm được server cụ thể, nhảy đại vào game sau 5 giây
-        wait(5)
-        TeleportService:Teleport(PlaceId, Players.LocalPlayer)
-    end
+    -- Nếu lỗi hoặc không tìm thấy server cụ thể, nhảy đại vào server ngẫu nhiên của Roblox
+    TeleportService:Teleport(PlaceId)
 end
 
--- Lắng nghe thông báo lỗi từ hệ thống
+-- Bắt sự kiện lỗi là nhảy ngay không đợi 1 giây nào
 GuiService.ErrorMessageChanged:Connect(function()
-    local errorPrompt = GuiService:GetErrorMessage()
-    if errorPrompt ~= "" then
-        print("Phat hien bi Kick/Lag. Dang doi 15 giay de on dinh truoc khi Hop...")
-        
-        -- QUAN TRỌNG: Đợi 15 giây để Roblox đóng hẳn session cũ
-        wait(15) 
-        
-        SmartServerHop()
+    local errorMsg = GuiService:GetErrorMessage()
+    if errorMsg ~= "" then
+        InstantHop()
     end
 end)
 
--- Tự động tắt bảng lỗi để tránh bị treo màn hình xám
+-- Theo dõi bảng thông báo lỗi để ép nhảy
 spawn(function()
-    while wait(1) do
-        local coreGui = game:GetService("CoreGui")
-        if coreGui:FindFirstChild("ErrorMessagePrompt") then
-            game:GetService("TeleportService"):Teleport(game.PlaceId)
+    while true do
+        local gui = game:GetService("CoreGui"):FindFirstChild("RobloxPromptGui")
+        if gui and gui:FindFirstChild("promptOverlay") then
+            InstantHop()
         end
+        task.wait(0.5) -- Kiểm tra mỗi 0.5 giây
     end
 end)
 
-print("--- [Gemini] Smart Auto Hop Loaded (Anti-Disconnect) ---")
+print("--- [Instant Hop] Đã kích hoạt chế độ nhảy thần tốc ---")
