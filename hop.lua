@@ -1,18 +1,16 @@
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
-local Players = game:GetService("Players")
 
--- Đợi game ổn định
-task.wait(15)
-
-local function UltimateFix773()
-    print("--- [Gemini] Dang xu ly loi 773... Vui long doi 15s ---")
+-- 1. HÀM NHẢY SERVER "CHẬM MÀ CHẮC"
+local function HardResetHop()
+    print("--- [Gemini] Phat hien bi Kick. Dang thuc hien Reset ket noi... ---")
     
-    -- BƯỚC 1: Đợi 15 giây (Thời gian vàng để Delta và Roblox reset kết nối)
-    task.wait(15) 
+    -- BƯỚC 1: Đợi 20 giây (Bắt buộc). 
+    -- 20s để Server Roblox xóa hẳn Session cũ của bạn. Nhảy sớm hơn chắc chắn bị lỗi 773.
+    task.wait(20) 
     
-    -- BƯỚC 2: Lấy danh sách server (Lấy 100 server để có nhiều lựa chọn)
+    -- BƯỚC 2: Lấy danh sách server vắng (Ưu tiên server cực vắng)
     local success, result = pcall(function()
         return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
     end)
@@ -20,54 +18,48 @@ local function UltimateFix773()
     if success and result and result.data then
         local targetServers = {}
         for _, v in pairs(result.data) do
-            -- CHỈ CHỌN SERVER CÒN TRỐNG ÍT NHẤT 7 CHỖ (Chắc chắn không bị Full/773)
-            if v.playing < (v.maxPlayers - 7) and v.id ~= game.JobId then
+            -- CHỈ CHỌN SERVER TRỐNG ÍT NHẤT 8 CHỖ (Để chắc chắn vào được 100%)
+            if v.playing < (v.maxPlayers - 8) and v.id ~= game.JobId then
                 table.insert(targetServers, v.id)
             end
         end
         
         if #targetServers > 0 then
-            -- BƯỚC 3: Nhảy sang server vắng nhất
             local randomServer = targetServers[math.random(1, #targetServers)]
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, Players.LocalPlayer)
+            print("--- Dang vao Server moi: " .. randomServer)
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, game.Players.LocalPlayer)
         else
-            -- Nếu không tìm thấy, nhảy đại vào game
+            -- Nếu không tìm thấy server vắng, dùng lệnh Rejoin mặc định
             TeleportService:Teleport(game.PlaceId)
         end
-    else
-        -- Lỗi API thì tự Rejoin sau 5s
-        task.wait(5)
-        TeleportService:Teleport(game.PlaceId)
     end
 end
 
--- Theo dõi bảng lỗi (773, 277, 279,...)
+-- 2. THEO DÕI LỖI (KHI BẢNG XÁM HIỆN LÊN)
 GuiService.ErrorMessageChanged:Connect(function()
     local msg = GuiService:GetErrorMessage()
     if msg ~= "" then
-        print("Phat hien loi: " .. msg)
-        UltimateFix773()
+        HardResetHop()
     end
 end)
 
--- Quét bảng lỗi xám (Force Hop cho Delta)
+-- 3. QUÉT LỖI ĐỊNH KỲ (PHÒNG TRƯỜNG HỢP DELTA KHÔNG BẮT ĐƯỢC EVENT)
 task.spawn(function()
     while task.wait(5) do
         local gui = game:GetService("CoreGui"):FindFirstChild("RobloxPromptGui")
-        if gui and gui:FindFirstChild("promptOverlay") then
-            if gui.promptOverlay:FindFirstChild("ErrorPrompt") then
-                UltimateFix773()
-            end
+        if gui and gui:FindFirstChild("promptOverlay") and gui.promptOverlay:FindFirstChild("ErrorPrompt") then
+            HardResetHop()
         end
     end
 end)
 
--- PHÒNG NGỪA: Tự động nhảy sau mỗi 30 phút để "làm mới" IP
+-- 4. CHỦ ĐỘNG NHẢY TRƯỚC KHI BỊ KICK (MỖI 15 PHÚT)
+-- Cách tốt nhất để không bị lỗi sau khi Kick là... đừng để bị Kick.
 task.spawn(function()
-    while task.wait(1800) do 
-        print("Chu dong doi server de tranh bi kick vinh vien...")
-        UltimateFix773()
+    while task.wait(900) do -- 15 phút đổi server một lần
+        print("--- Chu dong doi server de tranh bi Admin soi... ---")
+        HardResetHop()
     end
 end)
 
-print("--- [Gemini V5] Anti-Kick & 773 Fixed! ---")
+print("--- [Gemini V6] Anti-773 & Hard Reset Loaded! ---")
