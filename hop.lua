@@ -1,72 +1,76 @@
+-- [[ ANTI-DISCONNECT & ULTIMATE SERVER HOP V4 ]]
+if not game:IsLoaded() then game.Loaded:Wait() end
+
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local GuiService = game:GetService("GuiService")
 
--- Đợi 10 giây ban đầu để ổn định
-task.wait(10)
+-- Chống lỗi đứng Script khi nhảy Server
+if syn and syn.queue_on_teleport then
+    syn.queue_on_teleport([[print("Dang tiep tuc thuc thi Script sau khi Hop...")]])
+elseif queue_on_teleport then
+    queue_on_teleport([[print("Dang tiep tuc thuc thi Script sau khi Hop...")]])
+end
 
-local function AbsoluteForceHop()
-    print("--- [Gemini] Dang giai phong bo nho va Reset Teleport... ---")
-    
-    -- BƯỚC 1: Dừng tất cả các hành động của nhân vật để tránh bị kẹt 773
-    pcall(function()
-        Players.LocalPlayer.Character.HumanoidRootPart.Anchored = true
+local function UltimateHop()
+    print("--- Dang tim kiem Server 'Sach' de tranh loi ket noi ---")
+    local PlaceId = game.PlaceId
+    local Success, Servers = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
     end)
-    
-    -- BƯỚC 2: Nghỉ 20 giây (Thời gian chuẩn để Reset lỗi 267/773)
-    task.wait(20) 
-    
-    local success, result = pcall(function()
-        -- Lấy danh sách server cực vắng (100 server)
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
-    end)
-    
-    if success and result and result.data then
-        -- Lọc server còn trống ít nhất 12 chỗ (Mức an toàn tuyệt đối)
-        local safeServers = {}
-        for _, v in pairs(result.data) do
-            if v.playing < (v.maxPlayers - 12) and v.id ~= game.JobId then
-                table.insert(safeServers, v.id)
+
+    if Success and Servers then
+        local BestServers = {}
+        for _, v in pairs(Servers) do
+            -- Chỉ chọn server còn trống ít nhất 2 chỗ để tránh bị Full khi đang vào
+            if type(v) == "table" and v.playing < (v.maxPlayers - 2) and v.id ~= game.JobId then
+                table.insert(BestServers, v.id)
             end
         end
-        
-        if #safeServers > 0 then
-            -- Chọn server ngẫu nhiên trong danh sách vắng
-            local targetId = safeServers[math.random(1, #safeServers)]
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, Players.LocalPlayer)
+
+        if #BestServers > 0 then
+            local Target = BestServers[math.random(1, #BestServers)]
+            -- Thủ thuật: Đợi 3 giây để xóa Cache phiên cũ trước khi thực hiện Teleport
+            task.wait(3)
+            TeleportService:TeleportToPlaceInstance(PlaceId, Target, Players.LocalPlayer)
         else
-            TeleportService:Teleport(game.PlaceId)
+            -- Nếu không tìm được server vắng, nhảy đại vào server bất kỳ
+            TeleportService:Teleport(PlaceId, Players.LocalPlayer)
         end
-    else
-        -- Nếu lỗi API, dùng lệnh Rejoin của hệ thống
-        TeleportService:Teleport(game.PlaceId)
     end
 end
 
--- VÒNG LẶP KIỂM TRA BẢNG LỖI (Mỗi 3 giây)
-task.spawn(function()
-    while true do
-        local coreGui = game:GetService("CoreGui")
-        local promptGui = coreGui:FindFirstChild("RobloxPromptGui")
-        
-        if promptGui and promptGui:FindFirstChild("promptOverlay") then
-            local errorPrompt = promptGui.promptOverlay:FindFirstChild("ErrorPrompt")
-            if errorPrompt then
-                -- Nếu thấy bảng lỗi hiện lên (Bất kể mã gì), ép nhảy ngay
-                AbsoluteForceHop()
-            end
+-- BỘ LỌC LỖI TRIỆT ĐỂ
+GuiService.ErrorMessageChanged:Connect(function()
+    local msg = GuiService:GetErrorMessage()
+    -- Bắt tất cả các loại lỗi: Kick, Disconnect, Internet, Teleport Failed
+    if msg ~= "" then
+        warn("Loi he thong: " .. msg)
+        -- QUAN TRỌNG: Nghỉ 10 giây để Server Roblox xác nhận bạn đã Offline hoàn toàn
+        task.wait(10) 
+        UltimateHop()
+    end
+end)
+
+-- AUTO RECONNECT NẾU GAME BỊ ĐỨNG (IDLE)
+spawn(function()
+    while task.wait(5) do
+        -- Nếu bị treo ở màn hình loading quá lâu
+        if #Players:GetPlayers() <= 1 and game.Loaded then
+            task.wait(5)
+            UltimateHop()
         end
-        task.wait(3)
     end
 end)
 
--- PHÒNG NGỪA: Tự động đổi server mỗi 10 phút
--- Vì bạn bị Kick 267 liên tục, hãy nhảy server thật nhanh để xóa dấu vết farm
-task.spawn(function()
-    while task.wait(600) do 
-        print("--- Chu dong doi server de xoa dau vet Anti-cheat ---")
-        AbsoluteForceHop()
+-- Tự động bấm nút "Leave" hoặc "Reconnect" ngầm để kích hoạt Script
+local coreGui = game:GetService("CoreGui")
+coreGui.ChildAdded:Connect(function(child)
+    if child.Name == "ErrorMessagePrompt" then
+        task.wait(2)
+        UltimateHop()
     end
 end)
 
-print("--- [Gemini V7] Ultimate Anti-267/773 Fix Loaded! ---")
+print("--- [Gemini] Ultimate Hop V4: DA KICH HOAT ---")
