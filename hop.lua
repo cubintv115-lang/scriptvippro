@@ -1,56 +1,63 @@
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 
--- Đợi game ổn định hoàn toàn
-task.wait(10)
-
-local function SafeHop()
-    local PlaceId = game.PlaceId
-    -- Lấy danh sách server (SortOrder=Asc để lấy server cũ, ổn định hơn)
+-- 1. CƠ CHẾ NHẢY SERVER AN TOÀN TUYỆT ĐỐI
+local function UltimateSafeHop()
+    print("--- [Gemini] Dang thuc hien lam moi ket noi... ---")
     local success, result = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=50"))
+        -- Lay danh sach server voi bo loc rong rai hon (100 server)
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
     end)
     
     if success and result and result.data then
         local targetServers = {}
         for _, v in pairs(result.data) do
-            -- Chỉ chọn server còn trống ít nhất 3 chỗ để tránh lỗi 773 (Server đầy/đang đóng)
-            if v.playing < (v.maxPlayers - 3) and v.id ~= game.JobId then
+            -- CHỈ CHỌN SERVER CÒN TRỐNG ÍT NHẤT 5 CHỖ (De tranh loi 773 va mat ket noi)
+            if v.playing < (v.maxPlayers - 5) and v.id ~= game.JobId then
                 table.insert(targetServers, v.id)
             end
         end
         
         if #targetServers > 0 then
-            -- Thử nhảy 
             local randomServer = targetServers[math.random(1, #targetServers)]
-            TeleportService:TeleportToPlaceInstance(PlaceId, randomServer, game.Players.LocalPlayer)
+            -- Truoc khi nhay, doi 5s de Roblox xoa cache cu
+            task.wait(5)
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, Players.LocalPlayer)
         else
-            -- Nếu không có server ưng ý, quay lại server mặc định
-            TeleportService:Teleport(PlaceId)
+            TeleportService:Teleport(game.PlaceId)
         end
     end
 end
 
--- Xử lý khi hiện bảng lỗi (Bao gồm lỗi 773)
-GuiService.ErrorMessageChanged:Connect(function()
-    local msg = GuiService:GetErrorMessage()
-    if msg ~= "" then
-        print("Phat hien loi: " .. msg .. ". Dang chuan bi nhay sau 10s...")
-        -- Nghỉ 10 giây để reset dữ liệu Teleport của Roblox
-        task.wait(10)
-        SafeHop()
+-- 2. TỰ ĐỘNG LÀM MỚI SAU 1 TIẾNG (Tránh treo quá lâu dẫn đến lag IP)
+task.spawn(function()
+    while task.wait(3600) do -- Cu moi 1 tieng (3600 giay) tu dong chuyen server 1 lan
+        print("--- Treo da lau, tu dong doi server de tranh lag Session ---")
+        UltimateSafeHop()
     end
 end)
 
--- Quét bảng lỗi cứng đầu trong UI
+-- 3. THEO DÕI LỖI MẠNG (Mã lỗi 773, 277, 279,...)
+GuiService.ErrorMessageChanged:Connect(function()
+    if GuiService:GetErrorMessage() ~= "" then
+        print("Phat hien loi ket noi. Dang doi 15s de Reset...")
+        task.wait(15) -- Doi 15s la thoi gian vang de nha mang nha IP
+        UltimateSafeHop()
+    end
+end)
+
+-- 4. QUÉT BẢNG LỖI CỨNG ĐẦU
 task.spawn(function()
-    while task.wait(5) do
-        local gui = game:GetService("CoreGui"):FindFirstChild("RobloxPromptGui")
-        if gui and gui:FindFirstChild("promptOverlay") and gui.promptOverlay:FindFirstChild("ErrorPrompt") then
-            SafeHop()
+    while task.wait(10) do
+        local coreGui = game:GetService("CoreGui")
+        if coreGui:FindFirstChild("RobloxPromptGui") and coreGui.RobloxPromptGui:FindFirstChild("promptOverlay") then
+            if coreGui.RobloxPromptGui.promptOverlay:FindFirstChild("ErrorPrompt") then
+                UltimateSafeHop()
+            end
         end
     end
 end)
 
-print("--- [Gemini] Anti-Error 773 Loaded! ---")
+print("--- [Gemini V4] Anti-Disconnect & Auto Refresh Loaded! ---")
