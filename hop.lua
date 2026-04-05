@@ -1,65 +1,72 @@
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 
--- 1. HÀM NHẢY SERVER "CHẬM MÀ CHẮC"
-local function HardResetHop()
-    print("--- [Gemini] Phat hien bi Kick. Dang thuc hien Reset ket noi... ---")
+-- Đợi 10 giây ban đầu để ổn định
+task.wait(10)
+
+local function AbsoluteForceHop()
+    print("--- [Gemini] Dang giai phong bo nho va Reset Teleport... ---")
     
-    -- BƯỚC 1: Đợi 20 giây (Bắt buộc). 
-    -- 20s để Server Roblox xóa hẳn Session cũ của bạn. Nhảy sớm hơn chắc chắn bị lỗi 773.
+    -- BƯỚC 1: Dừng tất cả các hành động của nhân vật để tránh bị kẹt 773
+    pcall(function()
+        Players.LocalPlayer.Character.HumanoidRootPart.Anchored = true
+    end)
+    
+    -- BƯỚC 2: Nghỉ 20 giây (Thời gian chuẩn để Reset lỗi 267/773)
     task.wait(20) 
     
-    -- BƯỚC 2: Lấy danh sách server vắng (Ưu tiên server cực vắng)
     local success, result = pcall(function()
+        -- Lấy danh sách server cực vắng (100 server)
         return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
     end)
     
     if success and result and result.data then
-        local targetServers = {}
+        -- Lọc server còn trống ít nhất 12 chỗ (Mức an toàn tuyệt đối)
+        local safeServers = {}
         for _, v in pairs(result.data) do
-            -- CHỈ CHỌN SERVER TRỐNG ÍT NHẤT 8 CHỖ (Để chắc chắn vào được 100%)
-            if v.playing < (v.maxPlayers - 8) and v.id ~= game.JobId then
-                table.insert(targetServers, v.id)
+            if v.playing < (v.maxPlayers - 12) and v.id ~= game.JobId then
+                table.insert(safeServers, v.id)
             end
         end
         
-        if #targetServers > 0 then
-            local randomServer = targetServers[math.random(1, #targetServers)]
-            print("--- Dang vao Server moi: " .. randomServer)
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, game.Players.LocalPlayer)
+        if #safeServers > 0 then
+            -- Chọn server ngẫu nhiên trong danh sách vắng
+            local targetId = safeServers[math.random(1, #safeServers)]
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, Players.LocalPlayer)
         else
-            -- Nếu không tìm thấy server vắng, dùng lệnh Rejoin mặc định
             TeleportService:Teleport(game.PlaceId)
         end
+    else
+        -- Nếu lỗi API, dùng lệnh Rejoin của hệ thống
+        TeleportService:Teleport(game.PlaceId)
     end
 end
 
--- 2. THEO DÕI LỖI (KHI BẢNG XÁM HIỆN LÊN)
-GuiService.ErrorMessageChanged:Connect(function()
-    local msg = GuiService:GetErrorMessage()
-    if msg ~= "" then
-        HardResetHop()
-    end
-end)
-
--- 3. QUÉT LỖI ĐỊNH KỲ (PHÒNG TRƯỜNG HỢP DELTA KHÔNG BẮT ĐƯỢC EVENT)
+-- VÒNG LẶP KIỂM TRA BẢNG LỖI (Mỗi 3 giây)
 task.spawn(function()
-    while task.wait(5) do
-        local gui = game:GetService("CoreGui"):FindFirstChild("RobloxPromptGui")
-        if gui and gui:FindFirstChild("promptOverlay") and gui.promptOverlay:FindFirstChild("ErrorPrompt") then
-            HardResetHop()
+    while true do
+        local coreGui = game:GetService("CoreGui")
+        local promptGui = coreGui:FindFirstChild("RobloxPromptGui")
+        
+        if promptGui and promptGui:FindFirstChild("promptOverlay") then
+            local errorPrompt = promptGui.promptOverlay:FindFirstChild("ErrorPrompt")
+            if errorPrompt then
+                -- Nếu thấy bảng lỗi hiện lên (Bất kể mã gì), ép nhảy ngay
+                AbsoluteForceHop()
+            end
         end
+        task.wait(3)
     end
 end)
 
--- 4. CHỦ ĐỘNG NHẢY TRƯỚC KHI BỊ KICK (MỖI 15 PHÚT)
--- Cách tốt nhất để không bị lỗi sau khi Kick là... đừng để bị Kick.
+-- PHÒNG NGỪA: Tự động đổi server mỗi 10 phút
+-- Vì bạn bị Kick 267 liên tục, hãy nhảy server thật nhanh để xóa dấu vết farm
 task.spawn(function()
-    while task.wait(900) do -- 15 phút đổi server một lần
-        print("--- Chu dong doi server de tranh bi Admin soi... ---")
-        HardResetHop()
+    while task.wait(600) do 
+        print("--- Chu dong doi server de xoa dau vet Anti-cheat ---")
+        AbsoluteForceHop()
     end
 end)
 
-print("--- [Gemini V6] Anti-773 & Hard Reset Loaded! ---")
+print("--- [Gemini V7] Ultimate Anti-267/773 Fix Loaded! ---")
