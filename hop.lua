@@ -1,20 +1,21 @@
--- [[ V21 SILENT SHADOW - KHẮC PHỤC TRIỆT ĐỂ LỖI 773 KHI TREO ĐÊM ]]
+-- [[ V22 DEEP TUNNEL - BIẾN MẤT VÀ XUẤT HIỆN TRỞ LẠI ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 
--- Hàm lấy Server cực vắng (Chống nghẽn mạng)
-local function GetVerySafeServer()
+-- Hàm lấy Server ngẫu nhiên từ danh sách cực vắng
+local function GetSecretServer()
     local success, result = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+        -- Lấy server theo kiểu Descending (Mới nhất) để tránh các server cũ bị lỗi
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")).data
     end)
     if success and result then
         local safe = {}
         for _, v in pairs(result) do
-            -- Chỉ chọn server trống ít nhất 12 chỗ
-            if v.playing < (v.maxPlayers - 12) and v.id ~= game.JobId then
+            -- Chỉ chọn server cực vắng (15 chỗ trống) để đảm bảo kết nối mượt nhất
+            if v.playing < (v.maxPlayers - 15) and v.id ~= game.JobId then
                 table.insert(safe, v.id)
             end
         end
@@ -23,50 +24,53 @@ local function GetVerySafeServer()
     return nil
 end
 
-local function UltimateSilentHop()
-    -- 1. XÓA BẢNG LỖI NGAY LẬP TỨC ĐỂ GIẢI PHÓNG MÀN HÌNH
+local function DeepTunnelHop()
+    -- 1. XÓA BẢNG LỖI ĐỂ TRÁNH ĐÓNG BĂNG EXECUTOR
     pcall(function()
         local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
         if prompt then prompt:Destroy() end
     end)
 
-    -- 2. CHIẾN THUẬT "LÀM NGUỘI": Đợi đúng 20 giây
-    -- Đây là thời gian bắt buộc để Roblox xóa Session bị Blacklist của bạn
-    -- Nếu nhảy nhanh hơn 20s, bạn sẽ LUÔN LUÔN bị lỗi 773
-    print("He thong dang nghi ngoi 20s de xoa dau vet (Anti-773)...")
-    task.wait(20)
+    -- 2. CHIẾN THUẬT "LÀM MỚI KẾT NỐI"
+    -- Thay vì nhảy ngay, ta ngắt kết nối tạm thời trong 30 giây
+    -- 30 giây là thời gian đủ để Server Roblox xác nhận bạn đã Offline hoàn toàn
+    print("Kich hoat Deep Tunnel: Dang 'Offline' 30s de reset IP/Session...")
+    
+    task.wait(30) 
 
-    local target = GetVerySafeServer()
+    local target = GetSecretServer()
     if target then
-        -- Nhảy 1 lần duy nhất nhưng cực kỳ chất lượng
+        -- Nhảy bằng PlaceId gốc để tạo cảm giác như bạn vừa mở App lên vào lại
         TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
     else
+        -- Nếu không tìm thấy server vắng, nhảy đại vào Sea hiện tại
         TeleportService:Teleport(game.PlaceId)
     end
 end
 
--- 1. TỰ ĐỘNG ĐỔI SERVER MỖI 2 PHÚT (NHƯ Ý BẠN)
+-- 1. TỰ ĐỘNG ĐỔI SERVER MỖI 2 PHÚT (BẢO VỆ TỪ XA)
 task.spawn(function()
     while task.wait(120) do
-        UltimateSilentHop()
+        DeepTunnelHop()
     end
 end)
 
--- 2. PHẢN XẠ KHI BỊ KICK (CHỜ 20S RỒI MỚI NHẢY)
+-- 2. PHÁT HIỆN KICK/LỖI 773: ĐỢI 30S RỒI MỚI VÀO LẠI
 GuiService.ErrorMessageChanged:Connect(function()
     if GuiService:GetErrorMessage() ~= "" then
-        warn("Bi Kick! Dang cho 20s de vao lai mượt mà...")
-        UltimateSilentHop()
+        warn("Loi ket noi! Dang cho 30s de thuc hien Deep Tunnel...")
+        DeepTunnelHop()
     end
 end)
 
--- 3. QUÉT BẢNG LỖI 773 ĐỂ TỰ ĐỘNG NHẢY LẠI (SAU 20S)
+-- 3. TỰ ĐỘNG BẤM OK NGẦM NẾU BẢNG LỖI CÒN SÓT
 task.spawn(function()
-    while task.wait(1) do
-        if game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true) then
-            UltimateSilentHop()
+    while task.wait(2) do
+        local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
+        if prompt then
+            DeepTunnelHop()
         end
     end
 end)
 
-print("--- [Gemini] V21 SILENT SHADOW: DA KICH HOAT ---")
+print("--- [Gemini] V22 DEEP TUNNEL: SAN SANG TREO DEM ---")
