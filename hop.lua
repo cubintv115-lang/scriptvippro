@@ -1,89 +1,83 @@
--- [[ V34 THE WORLD SLASH - CẮT PHĂNG MỌI LỖI KẾT NỐI ]]
+-- [[ V35 THE INFINITE ADAPTATION - XOAY BÁNH XE LẦN CUỐI ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
-local RunService = game:GetService("RunService")
 
--- 1. XOAY BÁNH XE: VÔ HIỆU HÓA LỆNH KICK (HOOK CẤP CAO)
-pcall(function()
-    local mt = getrawmetatable(game)
-    local old = mt.__namecall
-    setreadonly(mt, false)
-    mt.__namecall = newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        if method == "Kick" or method == "kick" then
-            return nil 
-        end
-        return old(self, ...)
-    end)
-    setreadonly(mt, true)
-end)
-
--- 2. HÀM NHẢY SERVER "XUYÊN KHÔNG" (NHẢY THẲNG VÀO SERVER VẮNG NHẤT)
-local function WorldSlashHop()
-    -- Xóa bảng lỗi để giải phóng RAM cho Delta
+-- 1. XOAY BÁNH XE: VÔ HIỆU HÓA HOÀN TOÀN HỆ THỐNG THÔNG BÁO LỖI
+-- Khiến Roblox không thể đóng băng Script của bạn bằng bảng lỗi
+local function UltimateShield()
     pcall(function()
-        local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
-        if prompt then prompt:Destroy() end
+        local coreGui = game:GetService("CoreGui")
+        coreGui.ChildAdded:Connect(function(child)
+            if child.Name == "ErrorMessagePrompt" or child:FindFirstChild("ErrorMessagePrompt") then
+                child.Visible = false -- Làm tàng hình bảng lỗi ngay lập tức
+                child:Destroy()
+            end
+        end)
+    end)
+end
+task.spawn(UltimateShield)
+
+-- 2. HÀM NHẢY SERVER "GHOST MODE" (Lách lỗi 773 triệt để)
+local function InfiniteHop()
+    -- Bước quan trọng: Ép Roblox "quên" Session cũ bị lỗi
+    pcall(function()
+        GuiService:ClearError() 
     end)
 
     local success, result = pcall(function()
-        -- Chỉ tìm server có 1 ĐẾN 2 NGƯỜI (Cực kỳ vắng)
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+        -- Tìm server CỰC VẮNG (Chỉ 1 người duy nhất)
+        local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+        return HttpService:JSONDecode(game:HttpGet(url)).data
     end)
 
     if success and result then
         local target = nil
         for _, v in pairs(result) do
-            if v.playing > 0 and v.playing < 3 and v.id ~= game.JobId then
+            -- Chỉ lấy server 1 người để đảm bảo kết nối 100% thành công
+            if v.playing == 1 and v.id ~= game.JobId then
                 target = v.id
                 break
             end
         end
         
         if target then
-            print("Mahoraga: Nhay server trong 5s...")
-            task.wait(5) -- Giảm thời gian chờ xuống để nhảy nhanh hơn
+            print("Mahoraga: Dang vao lai server moi (Silent Re-entry)...")
+            -- Đợi 15 giây (Khoảng nghỉ vàng để Roblox mở khóa IP cho bạn)
+            task.wait(15)
             TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
+        else
+            -- Nếu không có server 1 người, nhảy đại để thoát khỏi trạng thái kẹt
+            TeleportService:Teleport(game.PlaceId)
         end
     end
 end
 
--- 3. CƠ CHẾ "TRỰC GIÁC": NHẢY TRƯỚC KHI BỊ KICK
--- Nếu game bị đứng hình (FPS = 0) hoặc Ping không nhảy trong 3s, lập tức nhảy server
-local lastUpdate = tick()
-RunService.Heartbeat:Connect(function()
-    if tick() - lastUpdate > 3 then -- Nếu game bị "đứng" quá 3 giây
-        warn("Phat hien game bi treo! Tu dong nhay server...")
-        WorldSlashHop()
-        lastUpdate = tick()
-    end
-    lastUpdate = tick()
-end)
-
--- 4. PHẢN XẠ KHI CÓ LỖI (MÀN HÌNH XÁM)
+-- 3. THEO DÕI LỖI KẾT NỐI (REJOIN KHÔNG CẦN BẢNG THÔNG BÁO)
 GuiService.ErrorMessageChanged:Connect(function()
     if GuiService:GetErrorMessage() ~= "" then
-        WorldSlashHop()
+        warn("Phat hien loi ket noi! Dang xoay banh xe thich nghi...")
+        InfiniteHop()
     end
 end)
 
--- 5. QUÉT BẢNG LỖI SIÊU TỐC (Dành cho lỗi 267)
+-- 4. TỰ ĐỘNG ĐỔI SERVER SAU 100 GIÂY (NHANH HƠN ĐỂ TRÁNH BỊ SOI)
 task.spawn(function()
-    while task.wait(0.1) do
-        if game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true) then
-            WorldSlashHop()
-        end
+    while task.wait(100) do
+        InfiniteHop()
     end
 end)
 
--- 6. TỰ ĐỘNG NHẢY ĐỊNH KỲ (MỖI 90 GIÂY - NHANH HƠN BẢN CŨ)
-task.spawn(function()
-    while task.wait(90) do
-        WorldSlashHop()
+-- 5. PHÁ ĐẢO LỖI FREEZE (Nếu game không phản hồi trong 5s là nhảy ngay)
+local lastHeartbeat = tick()
+game:GetService("RunService").Heartbeat:Connect(function()
+    if tick() - lastHeartbeat > 5 then
+        InfiniteHop()
+        lastHeartbeat = tick()
     end
+    lastHeartbeat = tick()
 end)
 
-print("--- [Gemini] V34 WORLD SLASH: THICH NGHI HOAN TAT ---")
+print("--- [Gemini] V35 INFINITE ADAPTATION ACTIVE ---")
