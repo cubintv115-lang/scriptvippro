@@ -1,4 +1,4 @@
--- [[ V12 DOUBLE TIME & HYPER SPAM JOIN - BY GEMINI ]]
+-- [[ V13 SONIC HOP & HYPER SPAM - BY GEMINI ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
@@ -6,7 +6,7 @@ local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 
--- Hàm tìm Server cực vắng và thực hiện ép nhảy
+-- Hàm tìm Server cực vắng và thực hiện ép nhảy (Ưu tiên tốc độ)
 local function ForceServerHop()
     local success, result = pcall(function()
         return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")).data
@@ -15,8 +15,8 @@ local function ForceServerHop()
     if success and result then
         local targetServers = {}
         for _, v in pairs(result) do
-            -- Chọn server cực vắng (trống 5 chỗ) để đảm bảo vào được 100%
-            if v.playing < (v.maxPlayers - 5) and v.id ~= game.JobId then
+            -- Với tốc độ 1 phút, mình chọn server trống 3 chỗ để tìm nhanh hơn
+            if v.playing < (v.maxPlayers - 3) and v.id ~= game.JobId then
                 table.insert(targetServers, v.id)
             end
         end
@@ -25,43 +25,38 @@ local function ForceServerHop()
             local targetId = targetServers[math.random(1, #targetServers)]
             TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, Players.LocalPlayer)
         else
-            -- Nếu không tìm được server vắng, nhảy đại vào game
             TeleportService:Teleport(game.PlaceId)
         end
     end
 end
 
--- 1. CHẾ ĐỘ TỰ ĐỘNG ĐỔI SERVER SAU 2 PHÚT (120 GIÂY)
+-- 1. CHẾ ĐỘ TỰ ĐỘNG ĐỔI SERVER SAU 1 PHÚT (60 GIÂY)
 task.spawn(function()
-    while task.wait(120) do -- Đã chỉnh xuống 2 phút theo ý bạn
-        print("Da den 2 phut, dang tu dong doi Server de lam moi Session...")
+    while task.wait(60) do -- Đã chỉnh xuống 1 phút theo ý bạn
+        print("Da den 1 phut, dang tu dong doi Server de san muc tieu moi...")
         ForceServerHop()
     end
 end)
 
--- 2. CHẾ ĐỘ SPAM KHI BỊ KICK (KIỂM TRA LIÊN TỤC MỖI 0.5 GIÂY)
+-- 2. CHẾ ĐỘ KIỂM TRA LỖI SIÊU TỐC (0.5 GIÂY)
 task.spawn(function()
     while task.wait(0.5) do
-        -- Kiểm tra lỗi hệ thống hoặc bảng ErrorPrompt
         local hasError = GuiService:GetErrorMessage() ~= "" 
         local hasPrompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
         
         if hasError or hasPrompt then
-            print("Phat hien bi Kick/Loi! Dang thuc hien Spam Join ngay lap tuc...")
             ForceServerHop()
-            task.wait(3) -- Nghỉ 3s để tránh bị spam quá tải rồi lại tiếp tục nếu chưa nhảy được
+            task.wait(2) -- Nghỉ ngắn để tiếp tục nã lệnh nếu chưa nhảy được
         end
     end
 end)
 
--- 3. TỰ ĐỘNG BẤM NÚT RECONNECT/LEAVE TRÊN MÀN HÌNH (DÀNH CHO MÁY TREO)
-game:GetService("CoreGui").ChildAdded:Connect(function(child)
-    if child.Name == "ErrorMessagePrompt" or child:FindFirstChild("ErrorTitle") then
+-- 3. CHỐNG TREO LOADING (Nếu load server quá 15s không xong thì nhảy tiếp)
+task.spawn(function()
+    task.wait(15)
+    if #Players:GetPlayers() <= 1 then
         ForceServerHop()
     end
 end)
 
--- 4. TỐI ƯU TREO MÁY (GIẢM GIẬT LAG KHI LOAD SERVER LIÊN TỤC)
-settings().Network.IncomingReplicationLag = 0
-
-print("--- [Gemini] V12 DOUBLE TIME: AUTO HOP 2 MINS & HYPER SPAM ACTIVE ---")
+print("--- [Gemini] V13 SONIC: AUTO HOP 1 MIN ACTIVE ---")
