@@ -1,11 +1,11 @@
--- [[ V41 THE ORIGIN ADAPTATION - FIX REJOIN SAU UPDATE BLOX FRUITS ]]
+-- [[ V42 THE VOID WALKER - FIX TREO MAY KHI CHAN KICK ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 
--- 1. XOAY BÁNH XE: CHẶN ĐỨNG SỰ ĐÌNH CHỈ CỦA ROBLOX
+-- 1. XOAY BÁNH XE: CHẶN KICK & KÍCH HOẠT NHẢY KHẨN CẤP
 pcall(function()
     local mt = getrawmetatable(game)
     setreadonly(mt, false)
@@ -13,9 +13,8 @@ pcall(function()
     mt.__namecall = newcclosure(function(self, ...)
         local method = getnamecallmethod()
         if method == "Kick" or method == "kick" then
-            warn("--- [MAHORAGA] DA CHAN DON KICK TU ADMIN! ---")
-            -- Thay vì đứng im, ta ra lệnh nhảy server ngay tại đây
-            task.spawn(function() OriginHop() end)
+            warn("--- [MAHORAGA] PHÁT HIỆN LỆNH KICK -> NHẢY SERVER NGAY ---")
+            task.spawn(function() OriginHop() end) -- Nhảy ngay khi lệnh kick vừa được gọi
             return nil 
         end
         return oldNamecall(self, ...)
@@ -23,13 +22,12 @@ pcall(function()
     setreadonly(mt, true)
 end)
 
--- 2. HÀM NHẢY SERVER "NGUYÊN THỦY" (KHÔNG ƯU TIÊN SERVER 1 NGƯỜI)
+-- 2. HÀM NHẢY SERVER "XUYÊN KHÔNG" (Ưu tiên Server 6-12 người)
 function OriginHop()
-    -- Xóa lỗi để mở đường cho kết nối mới
+    -- Xóa lỗi để giải phóng bộ nhớ cho Delta
     pcall(function() GuiService:ClearError() end)
 
     local success, result = pcall(function()
-        -- Lấy server có lượng người vừa phải (6-12 người) để trà trộn
         local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
         return HttpService:JSONDecode(game:HttpGet(url)).data
     end)
@@ -37,7 +35,7 @@ function OriginHop()
     if success and result then
         local target = nil
         for _, v in pairs(result) do
-            -- Tránh server 1 người, chọn server từ 6 đến 12 người
+            -- Tránh server 1 người, chọn server đông người để trà trộn
             if v.playing >= 6 and v.playing <= 12 and v.id ~= game.JobId then
                 target = v.id
                 break
@@ -45,40 +43,41 @@ function OriginHop()
         end
         
         if target then
-            print("V41: Dang thuc hien cu nhay nguyen thuy sang Server ".. tostring(target) .." nguoi...")
-            -- Đợi 8 giây để lách bộ lọc Anti-Hopping của Roblox
-            task.wait(8)
+            print("V42: Đang thực hiện bước nhảy hư không...")
+            -- Không đợi lâu, nhảy trong 3s trước khi Delta bị treo hoàn toàn
+            task.wait(3)
             TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
+        else
+            TeleportService:Teleport(game.PlaceId)
         end
     end
 end
 
--- 3. FIX LỖI 773 (KẾT NỐI KHÔNG THÀNH CÔNG)
+-- 3. THEO DÕI PING -1MS (PHÒNG THỦ TỐI CAO)
+-- Nếu Ping = -1ms, nghĩa là máy bạn đã mất kết nối ngầm, phải ép nhảy ngay
+task.spawn(function()
+    while task.wait(1) do
+        local stats = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]
+        local ping = stats:GetValue()
+        
+        if ping <= 0 then -- Đây là trạng thái trong ảnh của bạn
+            warn("Ping am! May da bi treo. Dang cuu ho...")
+            OriginHop()
+            task.wait(10) -- Đợi 10s để lệnh teleport có thời gian xử lý
+        end
+    end
+end)
+
+-- 4. FIX LỖI KẾT NỐI (773)
 GuiService.ErrorMessageChanged:Connect(function()
     if GuiService:GetErrorMessage() ~= "" then
         OriginHop()
     end
 end)
 
--- 4. THEO DÕI PING FREEZE (Nếu Ping đứng im 4s là nhảy ngay)
+-- 5. TỰ ĐỘNG ĐỔI SERVER ĐỊNH KỲ (90 GIÂY)
 task.spawn(function()
-    local lastPing = 0
-    local count = 0
-    while task.wait(1) do
-        local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
-        if ping == lastPing and lastPing ~= 0 then
-            count = count + 1
-            if count >= 4 then OriginHop() end
-        else
-            count = 0
-        end
-        lastPing = ping
-    end
+    while task.wait(90) do OriginHop() end
 end)
 
--- 5. TỰ ĐỘNG ĐỔI SERVER SAU 100 GIÂY
-task.spawn(function()
-    while task.wait(100) do OriginHop() end
-end)
-
-print("--- [Gemini] V41 ORIGIN ACTIVE: DA FIX LOI SAU UPDATE ---")
+print("--- [Gemini] V42 VOID WALKER ACTIVE ---")
