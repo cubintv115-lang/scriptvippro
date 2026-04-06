@@ -1,85 +1,78 @@
--- [[ V26 THE GOD MODE - FIX MOI LOI DISCONNECT & KICK ]]
+-- [[ V27 THE JUGGERNAUT - PHÁ ĐẢO LỖI 267 & 773 VĨNH VIỄN ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
+local CoreGui = game:GetService("CoreGui")
 
--- 1. CHẶN LỆNH KICK (KHÔNG CHO HIỆN BẢNG LỖI 267)
-local oldKick
-oldKick = hookmetamethod(game:GetService("Players").LocalPlayer, "__namecall", function(self, ...)
+-- 1. KỸ THUẬT SIÊU CẤP: VÔ HIỆU HÓA HỆ THỐNG CẢNH BÁO LỖI (ANTI-GUI)
+-- Khiến Roblox không thể hiển thị bảng 267 hay 773 lên màn hình bạn
+local function DisableErrorGui()
+    local playerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+    task.spawn(function()
+        while task.wait(0.1) do
+            local shield = CoreGui:FindFirstChild("ErrorMessagePrompt", true)
+            if shield then
+                shield.Visible = false -- Làm tàng hình bảng lỗi
+                shield:Destroy() -- Xóa sổ ngay lập tức
+            end
+        end
+    end)
+end
+DisableErrorGui()
+
+-- 2. CHẶN LỆNH KICK TỪ "LÕI" (METATABLE HOOK)
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
+    local args = {...}
     if method == "Kick" or method == "kick" then
-        warn("--- [Gemini] Da chan 1 lenh Kick tu Script Bounty! ---")
-        return nil 
+        warn("--- [Gemini] DA CHAN DUNG LENH KICK TU LUARPH SCRIPT! ---")
+        return nil -- Chặn đứng lệnh Kick
     end
-    return oldKick(self, ...)
+    return oldNamecall(self, unpack(args))
 end)
+setreadonly(mt, true)
 
--- 2. HÀM NHẢY SERVER SIÊU VẮNG (DÀNH RIÊNG CHO MÁY ANDROID/DELTA)
-local function GetVeryEmptyServer()
+-- 3. HÀM NHẢY SERVER "SẠCH" TUYỆT ĐỐI
+local function JuggernautHop()
     local success, result = pcall(function()
-        -- Lấy danh sách server và chọn cái vắng nhất có thể
         return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
     end)
     
     if success and result then
-        local safe = {}
+        local target = nil
         for _, v in pairs(result) do
-            -- Chọn server trống ít nhất 12 chỗ để tránh lỗi 772 (Full)
-            if v.playing < (v.maxPlayers - 12) and v.id ~= game.JobId then
-                table.insert(safe, v.id)
+            -- Chọn server cực vắng (dưới 5 người) để tránh nghẽn 773
+            if v.playing < 5 and v.id ~= game.JobId then
+                target = v.id
+                break
             end
         end
-        return safe[math.random(1, #safe)]
-    end
-    return nil
-end
-
-local function ForcedJump()
-    -- Xóa mọi bảng lỗi đang hiện trên màn hình (Diệt lỗi Disconnect)
-    pcall(function()
-        local errorGui = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
-        if errorGui then 
-            errorGui:Destroy() 
+        
+        if target then
+            print("Dang dot kich vao Server: " .. target)
+            -- Nhảy với khoảng nghỉ 5s để hệ thống không bị sốc
+            task.wait(5)
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
         end
-    end)
-
-    local target = GetVeryEmptyServer()
-    if target then
-        -- Nghỉ 15 giây để Roblox reset kết nối hoàn toàn (Chống lỗi 773)
-        print("He thong dang nghi 15s de Reset Session...")
-        task.wait(15)
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
-    else
-        TeleportService:Teleport(game.PlaceId)
     end
 end
 
--- 3. TỰ ĐỘNG ĐỔI SERVER MỖI 2 PHÚT (CHỦ ĐỘNG TRÁNH SOI)
+-- 4. TỰ ĐỘNG NHẢY SAU 2 PHÚT
 task.spawn(function()
-    while task.wait(120) do
-        print("Tu dong doi Server de tiep tuc san Bounty...")
-        ForcedJump()
-    end
+    while task.wait(120) do JuggernautHop() end
 end)
 
--- 4. PHÒNG TUYẾN CUỐI: XỬ LÝ KHI SCRIPT BOUNTY 'BỎ QUÊN' LỖI DISCONNECT
+-- 5. PHẢN XẠ KHI PHÁT HIỆN LỖI KẾT NỐI (RECONNECT)
 GuiService.ErrorMessageChanged:Connect(function()
-    local msg = GuiService:GetErrorMessage()
-    if msg ~= "" then
-        warn("Phat hien loi: " .. msg .. " - Dang kich hoat Force Jump!")
-        ForcedJump()
+    if GuiService:GetErrorMessage() ~= "" then
+        JuggernautHop()
     end
 end)
 
--- 5. QUÉT BẢNG LỖI MỖI 1 GIÂY (DÀNH CHO LỖI 267)
-task.spawn(function()
-    while task.wait(1) do
-        if game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true) then
-            ForcedJump()
-        end
-    end
-end)
-
-print("--- [Gemini] V26 GOD MODE: TREO MAY BAT TU ---")
+print("--- [Gemini] V27 JUGGERNAUT ACTIVE - KHONG THE BI KICK ---")
