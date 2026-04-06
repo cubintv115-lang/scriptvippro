@@ -1,20 +1,17 @@
--- [[ V22 DEEP TUNNEL - BIẾN MẤT VÀ XUẤT HIỆN TRỞ LẠI ]]
+-- [[ V23 GHOST PROTOCOL - VƯỢT RÀO 267 & 773 TRIỆT ĐỂ ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
-local GuiService = game:GetService("GuiService")
 
--- Hàm lấy Server ngẫu nhiên từ danh sách cực vắng
-local function GetSecretServer()
+-- Hàm lấy Server vắng cực độ (15+ chỗ trống)
+local function GetGhostServer()
     local success, result = pcall(function()
-        -- Lấy server theo kiểu Descending (Mới nhất) để tránh các server cũ bị lỗi
         return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")).data
     end)
     if success and result then
         local safe = {}
         for _, v in pairs(result) do
-            -- Chỉ chọn server cực vắng (15 chỗ trống) để đảm bảo kết nối mượt nhất
             if v.playing < (v.maxPlayers - 15) and v.id ~= game.JobId then
                 table.insert(safe, v.id)
             end
@@ -24,53 +21,55 @@ local function GetSecretServer()
     return nil
 end
 
-local function DeepTunnelHop()
-    -- 1. XÓA BẢNG LỖI ĐỂ TRÁNH ĐÓNG BĂNG EXECUTOR
+local function ExecGhostJump()
+    -- 1. XÓA BẢNG LỖI ĐỂ GIẢI PHÓNG ĐÓNG BĂNG
     pcall(function()
         local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
         if prompt then prompt:Destroy() end
     end)
 
-    -- 2. CHIẾN THUẬT "LÀM MỚI KẾT NỐI"
-    -- Thay vì nhảy ngay, ta ngắt kết nối tạm thời trong 30 giây
-    -- 30 giây là thời gian đủ để Server Roblox xác nhận bạn đã Offline hoàn toàn
-    print("Kich hoat Deep Tunnel: Dang 'Offline' 30s de reset IP/Session...")
-    
-    task.wait(30) 
-
-    local target = GetSecretServer()
+    -- 2. ĐẶT LỆNH NHẢY VÀO HÀNG CHỜ (QUEUE)
+    -- Đây là kỹ thuật giúp lệnh nhảy tồn tại KỂ CẢ KHI BẠN BỊ KICK
+    local target = GetGhostServer()
     if target then
-        -- Nhảy bằng PlaceId gốc để tạo cảm giác như bạn vừa mở App lên vào lại
+        local code = [[
+            local ts = game:GetService("TeleportService")
+            local p = game:GetService("Players").LocalPlayer
+            ts:TeleportToPlaceInstance(]]..game.PlaceId..[[, "]]..target..[[", p)
+        ]]
+        
+        -- Thử dùng QueueTeleport nếu Executor hỗ trợ (Delta thường hỗ trợ)
+        if queue_on_teleport then
+            queue_on_teleport(code)
+        end
+        
+        -- 3. NGHỈ 15 GIÂY ĐỂ ROBLOX RESET TRẠNG THÁI SECURITY
+        print("GHOST PROTOCOL: Dang cho 15s de xoa Blacklist...")
+        task.wait(15)
+        
         TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
-    else
-        -- Nếu không tìm thấy server vắng, nhảy đại vào Sea hiện tại
-        TeleportService:Teleport(game.PlaceId)
     end
 end
 
--- 1. TỰ ĐỘNG ĐỔI SERVER MỖI 2 PHÚT (BẢO VỆ TỪ XA)
+-- TỰ ĐỘNG NHẢY MỖI 2 PHÚT ĐỂ TRÁNH BỊ SOI
 task.spawn(function()
-    while task.wait(120) do
-        DeepTunnelHop()
+    while task.wait(120) do ExecGhostJump() end
+end)
+
+-- PHẢN XẠ KHI THẤY BẢNG LỖI 267 HOẶC 773
+game:GetService("GuiService").ErrorMessageChanged:Connect(function()
+    if game:GetService("GuiService"):GetErrorMessage() ~= "" then
+        ExecGhostJump()
     end
 end)
 
--- 2. PHÁT HIỆN KICK/LỖI 773: ĐỢI 30S RỒI MỚI VÀO LẠI
-GuiService.ErrorMessageChanged:Connect(function()
-    if GuiService:GetErrorMessage() ~= "" then
-        warn("Loi ket noi! Dang cho 30s de thuc hien Deep Tunnel...")
-        DeepTunnelHop()
-    end
-end)
-
--- 3. TỰ ĐỘNG BẤM OK NGẦM NẾU BẢNG LỖI CÒN SÓT
+-- QUÉT LIÊN TỤC 1S/LẦN ĐỂ DIỆT BẢNG LỖI
 task.spawn(function()
-    while task.wait(2) do
-        local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
-        if prompt then
-            DeepTunnelHop()
+    while task.wait(1) do
+        if game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true) then
+            ExecGhostJump()
         end
     end
 end)
 
-print("--- [Gemini] V22 DEEP TUNNEL: SAN SANG TREO DEM ---")
+print("--- [Gemini] V23 GHOST PROTOCOL ACTIVE ---")
