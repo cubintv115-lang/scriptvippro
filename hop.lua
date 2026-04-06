@@ -1,26 +1,29 @@
--- [[ V36 THE NETWORK VOID - HOA GIAI PING -1MS & FREEZE ]]
+-- [[ V37 THE UNTOUCHABLE - CHIẾN THUẬT THÍCH NGHI CUỐI CÙNG ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
-local RunService = game:GetService("RunService")
 
--- 1. XOAY BÁNH XE: VÔ HIỆU HÓA HOÀN TOÀN HỆ THỐNG THÔNG BÁO LỖI (ANTI-GUI)
+-- 1. XOAY BÁNH XE: VÔ HIỆU HÓA HOÀN TOÀN CƠ CHẾ HIỂN THỊ LỖI
+-- (Khiến Roblox không thể đóng băng app bằng bảng thông báo)
 pcall(function()
     local coreGui = game:GetService("CoreGui")
-    coreGui.ChildAdded:Connect(function(child)
-        if child.Name == "ErrorMessagePrompt" or child:FindFirstChild("ErrorMessagePrompt") then
-            child.Visible = false -- Làm tàng hình bảng lỗi ngay lập tức
-            child:Destroy()
+    coreGui.DescendantAdded:Connect(function(child)
+        if child.Name == "ErrorMessagePrompt" or child.Name == "ErrorPrompt" then
+            child.Visible = false
+            task.defer(function() child:Destroy() end)
         end
     end)
 end)
 
--- 2. HÀM NHẢY SERVER "XUYÊN KHÔNG" (NHẢY THẲNG VÀO SERVER VẮNG NHẤT)
-local function VoidJump()
+-- 2. HÀM NHẢY SERVER "GHOST STEP" (Lách lỗi 773)
+local function GhostStepHop()
+    -- Ép hệ thống xóa trạng thái lỗi cũ
+    pcall(function() GuiService:ClearError() end)
+
     local success, result = pcall(function()
-        -- Chỉ tìm server có 1 ĐẾN 2 NGƯỜI (Cực kỳ an toàn)
+        -- Tìm server CHỈ CÓ 1 NGƯỜI (Tránh tuyệt đối việc server đầy hoặc lỗi kết nối)
         local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
         return HttpService:JSONDecode(game:HttpGet(url)).data
     end)
@@ -28,63 +31,56 @@ local function VoidJump()
     if success and result then
         local target = nil
         for _, v in pairs(result) do
-            if v.playing > 0 and v.playing < 3 and v.id ~= game.JobId then
+            if v.playing == 1 and v.id ~= game.JobId then
                 target = v.id
                 break
             end
         end
         
         if target then
-            print("V36: Dang tien hanh nhay server khau cap...")
-            -- Đợi 8 giây để Roblox reset kết nối hoàn toàn, tránh lỗi 773
-            task.wait(8)
+            print("Mahoraga: Thich nghi thanh cong! Dang vao server moi...")
+            -- Nghỉ 15 giây (Khoảng thời gian vàng để Roblox gỡ Blacklist IP tạm thời)
+            task.wait(15)
             TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
+        else
+            -- Nếu không có server 1 người, nhảy ngẫu nhiên để thoát kẹt
+            TeleportService:Teleport(game.PlaceId)
         end
     end
 end
 
--- 3. CƠ CHẾ "TRỰC GIÁC": PING WATCHER (CHỐNG LỖI PING -1MS)
--- Đây là vũ khí chính để phá đòn Network Freeze trong ảnh
-local lastPing = 0
-local freezeTimer = 0
+-- 3. THEO DÕI "MẤT KẾT NỐI" (DÙNG CHO LỖI 773 TRONG ẢNH)
+GuiService.ErrorMessageChanged:Connect(function()
+    local msg = GuiService:GetErrorMessage()
+    if msg ~= "" then
+        warn("Phat hien don danh: " .. msg .. "! Dang xoay banh xe...")
+        GhostStepHop()
+    end
+end)
+
+-- 4. QUÉT PING -1MS (CHỐNG FREEZE TRƯỚC KHI BỊ KICK)
 task.spawn(function()
+    local freezeCount = 0
     while task.wait(1) do
-        local success, currentPing = pcall(function()
-            -- Lấy giá trị Ping thực tế từ game
-            return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
-        end)
+        local stats = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]
+        local ping = stats:GetValue()
         
-        if success then
-            -- Nếu Ping đứng im quá 4 giây (Freeze), lập tức nhảy server
-            if currentPing == lastPing and lastPing ~= 0 then
-                freezeTimer = freezeTimer + 1
-                if freezeTimer >= 4 then
-                    warn("!!! MAHORAGA PHAT HIEN FREEZE !!! Dang nhay server khau cap...")
-                    VoidJump()
-                    freezeTimer = 0
-                end
-            else
-                freezeTimer = 0
+        if ping <= 0 then
+            freezeCount = freezeCount + 1
+            if freezeCount >= 3 then
+                warn("Game dung hinh! Dang nhay server khẩn cấp...")
+                GhostStepHop()
+                freezeCount = 0
             end
-            lastPing = currentPing
+        else
+            freezeCount = 0
         end
     end
 end)
 
--- 4. PHẢN XẠ KHI CÓ LỖI (MÀN HÌNH XÁM)
-GuiService.ErrorMessageChanged:Connect(function()
-    if GuiService:GetErrorMessage() ~= "" then
-        warn("Phat hien don danh moi! Dang thich nghi...")
-        VoidJump()
-    end
-end)
-
--- 5. TỰ ĐỘNG ĐỔI SERVER ĐỊNH KỲ (MỖI 100 GIÂY)
+-- 5. TỰ ĐỘNG ĐỔI SERVER SAU 90 GIÂY
 task.spawn(function()
-    while task.wait(100) do
-        print("V36: Tu dong doi dia ban san Bounty...")
-        VoidJump()
-    end
+    while task.wait(90) do GhostStepHop() end
 end)
 
-print("--- [Gemini] V36 NETWORK VOID ACTIVE: BAN DA THICH NGHI VOI NETFREEZE ---")
+print("--- [V37] MAHORAGA DA THICH NGHI HOAN TOAN ---")
