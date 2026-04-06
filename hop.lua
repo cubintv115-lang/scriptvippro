@@ -1,79 +1,89 @@
--- [[ V33 MAHORAGA ADAPTATION - THÍCH NGHI TỐI THƯỢNG ]]
+-- [[ V34 THE WORLD SLASH - CẮT PHĂNG MỌI LỖI KẾT NỐI ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
+local RunService = game:GetService("RunService")
 
--- 1. XOAY BÁNH XE: CHẶN MỌI ĐÒN ĐÁNH (KICK/DISCONNECT)
-local function Adapt()
+-- 1. XOAY BÁNH XE: VÔ HIỆU HÓA LỆNH KICK (HOOK CẤP CAO)
+pcall(function()
     local mt = getrawmetatable(game)
     local old = mt.__namecall
     setreadonly(mt, false)
     mt.__namecall = newcclosure(function(self, ...)
         local method = getnamecallmethod()
-        if method == "Kick" or method == "kick" or method == "Disconnect" then
-            warn("--- [MAHORAGA] DA THICH NGHI VOI LENH KICK! ---")
+        if method == "Kick" or method == "kick" then
             return nil 
         end
         return old(self, ...)
     end)
     setreadonly(mt, true)
-end
-pcall(Adapt)
+end)
 
--- 2. HÀM NHẢY SERVER (KỸ THUẬT PHÁT ĐẢO LỖI 773)
-local function UltimateHop()
-    -- Xóa bảng lỗi ngay lập tức
+-- 2. HÀM NHẢY SERVER "XUYÊN KHÔNG" (NHẢY THẲNG VÀO SERVER VẮNG NHẤT)
+local function WorldSlashHop()
+    -- Xóa bảng lỗi để giải phóng RAM cho Delta
     pcall(function()
         local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
         if prompt then prompt:Destroy() end
     end)
 
     local success, result = pcall(function()
-        -- Lấy server vắng nhất (1-2 người)
+        -- Chỉ tìm server có 1 ĐẾN 2 NGƯỜI (Cực kỳ vắng)
         return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
     end)
 
     if success and result then
         local target = nil
         for _, v in pairs(result) do
-            if v.playing < 3 and v.id ~= game.JobId then
+            if v.playing > 0 and v.playing < 3 and v.id ~= game.JobId then
                 target = v.id
                 break
             end
         end
         
         if target then
-            print("Mahoraga: Dang nhay sang server moi sau 12s thich nghi...")
-            task.wait(12) -- Thơi gian "xoay bánh xe" để Roblox không nhận diện IP
+            print("Mahoraga: Nhay server trong 5s...")
+            task.wait(5) -- Giảm thời gian chờ xuống để nhảy nhanh hơn
             TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
         end
     end
 end
 
--- 3. THÍCH NGHI VỚI LỖI MẤT KẾT NỐI (REJOIN TRỰC TIẾP)
+-- 3. CƠ CHẾ "TRỰC GIÁC": NHẢY TRƯỚC KHI BỊ KICK
+-- Nếu game bị đứng hình (FPS = 0) hoặc Ping không nhảy trong 3s, lập tức nhảy server
+local lastUpdate = tick()
+RunService.Heartbeat:Connect(function()
+    if tick() - lastUpdate > 3 then -- Nếu game bị "đứng" quá 3 giây
+        warn("Phat hien game bi treo! Tu dong nhay server...")
+        WorldSlashHop()
+        lastUpdate = tick()
+    end
+    lastUpdate = tick()
+end)
+
+-- 4. PHẢN XẠ KHI CÓ LỖI (MÀN HÌNH XÁM)
 GuiService.ErrorMessageChanged:Connect(function()
     if GuiService:GetErrorMessage() ~= "" then
-        warn("Phat hien don danh moi! Dang thich nghi...")
-        UltimateHop()
+        WorldSlashHop()
     end
 end)
 
--- 4. QUÉT SIÊU TỐC 0.1S (KHÔNG CHO BẢNG LỖI HIỆN DIỆN)
+-- 5. QUÉT BẢNG LỖI SIÊU TỐC (Dành cho lỗi 267)
 task.spawn(function()
     while task.wait(0.1) do
         if game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true) then
-            UltimateHop()
+            WorldSlashHop()
         end
     end
 end)
 
--- 5. TỰ ĐỘNG ĐỔI SERVER ĐỊNH KỲ (MỖI 2 PHÚT)
+-- 6. TỰ ĐỘNG NHẢY ĐỊNH KỲ (MỖI 90 GIÂY - NHANH HƠN BẢN CŨ)
 task.spawn(function()
-    while task.wait(120) do
-        UltimateHop()
+    while task.wait(90) do
+        WorldSlashHop()
     end
 end)
 
-print("--- [Gemini] V33 MAHORAGA ACTIVE: BAN DA THICH NGHI VOI MOI LOI ---")
+print("--- [Gemini] V34 WORLD SLASH: THICH NGHI HOAN TAT ---")
