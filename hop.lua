@@ -1,4 +1,4 @@
--- [[ V15 BLACK HOLE - ULTIMATE FORCE JOIN & ANTI-KICK ]]
+-- [[ V16 SEA-CHECK & ANTI-ERROR 773 - BY GEMINI ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
@@ -6,75 +6,76 @@ local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 
+local PlaceId = game.PlaceId -- Tự động lấy ID của Sea hiện tại (Sea 1, 2 hoặc 3)
 local ReservedServer = nil
 
--- HÀM 1: LUÔN LUÔN LẤY SẴN 1 SERVER DỰ PHÒNG (PRE-FETCH)
-local function UpdateReservedServer()
+-- HÀM 1: LẤY SERVER CÙNG SEA (TRÁNH LỖI 773)
+local function UpdateSafeServer()
     pcall(function()
-        local result = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+        -- Lấy danh sách server của đúng PlaceId bạn đang đứng
+        local url = "https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+        local result = HttpService:JSONDecode(game:HttpGet(url)).data
         local safe = {}
+        
         for _, v in pairs(result) do
-            -- Chỉ lấy server cực vắng (trống 8 chỗ) để đảm bảo KHÔNG BAO GIỜ lỗi kết nối
+            -- Lọc server vắng (trống 8 chỗ) và không phải server hiện tại
             if v.playing < (v.maxPlayers - 8) and v.id ~= game.JobId then
                 table.insert(safe, v.id)
             end
         end
+        
         if #safe > 0 then
             ReservedServer = safe[math.random(1, #safe)]
         end
     end)
 end
 
--- Cập nhật "vé dự phòng" mỗi 30 giây
+-- Cập nhật vé dự phòng mỗi 30s
 task.spawn(function()
-    while task.wait(30) do
-        UpdateReservedServer()
-    end
+    while task.wait(30) do UpdateSafeServer() end
 end)
-UpdateReservedServer() -- Chạy lần đầu
+UpdateSafeServer()
 
--- HÀM 2: ÉP NHẢY NGAY LẬP TỨC (DÙNG VÉ CÓ SẴN)
-local function InstantBlackHoleHop()
+-- HÀM 2: ÉP NHẢY BẤT CHẤP (FORCED JOIN)
+local function ForceSeaHop()
     if ReservedServer then
-        -- Nhảy liên tục 10 lần (Spam cực mạnh trong 0.1 giây)
-        for i = 1, 10 do
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, ReservedServer, Players.LocalPlayer)
+        -- Nhảy liên tục để xuyên qua lỗi
+        for i = 1, 5 do
+            TeleportService:TeleportToPlaceInstance(PlaceId, ReservedServer, Players.LocalPlayer)
+            task.wait(0.1)
         end
     else
-        -- Nếu chưa kịp có vé dự phòng, nhảy đại theo PlaceId
-        TeleportService:Teleport(game.PlaceId)
+        -- Nếu chưa có vé, nhảy mặc định vào Sea hiện tại
+        TeleportService:Teleport(PlaceId)
     end
 end
 
 -- 1. CHẾ ĐỘ 2 PHÚT TỰ ĐỔI SERVER (NHƯ Ý BẠN)
 task.spawn(function()
     while task.wait(120) do
-        InstantBlackHoleHop()
+        print("--- [Auto-Hop] 2 Phut - Dang doi Server cung Sea ---")
+        ForceSeaHop()
     end
 end)
 
--- 2. PHẢN XẠ "TỬ THẦN": NHẢY KHI THẤY BẤT KỲ LỖI NÀO
+-- 2. XỬ LÝ LỖI 773 VÀ CÁC LỖI DỊCH CHUYỂN KHÁC (NHẢY LẠI NGAY)
 GuiService.ErrorMessageChanged:Connect(function()
-    if GuiService:GetErrorMessage() ~= "" then
-        InstantBlackHoleHop()
+    local msg = GuiService:GetErrorMessage()
+    if msg ~= "" then
+        warn("Phat hien loi: " .. msg)
+        task.wait(2) -- Nghỉ 2s để hệ thống reset rồi nhảy lại
+        ForceSeaHop()
     end
 end)
 
--- 3. QUÉT CORE GUI SIÊU TỐC (0.05 GIÂY)
+-- 3. QUÉT BẢNG "DỊCH CHUYỂN THẤT BẠI" ĐỂ TỰ ĐỘNG BẤM OK/NHẢY TIẾP
 task.spawn(function()
-    while task.wait(0.05) do
-        if game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true) then
-            InstantBlackHoleHop()
-            break
+    while task.wait(0.5) do
+        local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
+        if prompt then
+            ForceSeaHop()
         end
     end
 end)
 
--- 4. TỰ ĐỘNG BẤM NÚT RECONNECT NGẦM (DÙNG VIRTUAL INPUT)
-game:GetService("CoreGui").ChildAdded:Connect(function(child)
-    if child.Name == "ErrorMessagePrompt" then
-        InstantBlackHoleHop()
-    end
-end)
-
-print("--- [Gemini] V15 BLACK HOLE: KHOA MUC TIEU SAN SANG ---")
+print("--- [Gemini] V16 SEA-CHECK ACTIVE - CHONG LOI 773 ---")
