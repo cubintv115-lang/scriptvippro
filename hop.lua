@@ -1,81 +1,67 @@
--- [[ V16 SEA-CHECK & ANTI-ERROR 773 - BY GEMINI ]]
+-- [[ V18 ANTI-UI ERROR & FORCE REJOIN - BY GEMINI ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
-local Players = game:GetService("Players")
 
-local PlaceId = game.PlaceId -- Tự động lấy ID của Sea hiện tại (Sea 1, 2 hoặc 3)
-local ReservedServer = nil
+-- 1. HÀM TỰ ĐỘNG XÓA BẢNG LỖI (QUAN TRỌNG)
+local function ClearErrorPrompts()
+    local coreGui = game:GetService("CoreGui")
+    local errorPrompt = coreGui:FindFirstChild("ErrorMessagePrompt", true)
+    if errorPrompt then
+        print("Phat hien bang loi! Dang tu dong xoa va nhay lai...")
+        -- Giam lap bam nut OK de tat bang loi
+        pcall(function()
+            local okButton = errorPrompt:FindFirstChild("Button", true) or errorPrompt:FindFirstChild("PrimaryButton", true)
+            if okButton then
+                -- Bam nut ngam
+                for _, connection in pairs(getconnections(okButton.MouseButton1Click)) do
+                    connection:Fire()
+                end
+            end
+        end)
+        task.wait(1)
+    end
+end
 
--- HÀM 1: LẤY SERVER CÙNG SEA (TRÁNH LỖI 773)
-local function UpdateSafeServer()
-    pcall(function()
-        -- Lấy danh sách server của đúng PlaceId bạn đang đứng
-        local url = "https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-        local result = HttpService:JSONDecode(game:HttpGet(url)).data
+-- 2. HÀM NHẢY SERVER SIÊU SẠCH (CHỈ LẤY ĐÚNG PLACEID HIỆN TẠI)
+local function SuperCleanHop()
+    ClearErrorPrompts()
+    local success, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+    end)
+    
+    if success and result then
         local safe = {}
-        
         for _, v in pairs(result) do
-            -- Lọc server vắng (trống 8 chỗ) và không phải server hiện tại
-            if v.playing < (v.maxPlayers - 8) and v.id ~= game.JobId then
+            if v.playing < (v.maxPlayers - 10) and v.id ~= game.JobId then
                 table.insert(safe, v.id)
             end
         end
         
         if #safe > 0 then
-            ReservedServer = safe[math.random(1, #safe)]
+            local target = safe[math.random(1, #safe)]
+            print("Dang nhay vao Server moi: " .. target)
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
         end
-    end)
-end
-
--- Cập nhật vé dự phòng mỗi 30s
-task.spawn(function()
-    while task.wait(30) do UpdateSafeServer() end
-end)
-UpdateSafeServer()
-
--- HÀM 2: ÉP NHẢY BẤT CHẤP (FORCED JOIN)
-local function ForceSeaHop()
-    if ReservedServer then
-        -- Nhảy liên tục để xuyên qua lỗi
-        for i = 1, 5 do
-            TeleportService:TeleportToPlaceInstance(PlaceId, ReservedServer, Players.LocalPlayer)
-            task.wait(0.1)
-        end
-    else
-        -- Nếu chưa có vé, nhảy mặc định vào Sea hiện tại
-        TeleportService:Teleport(PlaceId)
     end
 end
 
--- 1. CHẾ ĐỘ 2 PHÚT TỰ ĐỔI SERVER (NHƯ Ý BẠN)
+-- 3. TỰ ĐỘNG ĐỔI SERVER MỖI 2 PHÚT
 task.spawn(function()
     while task.wait(120) do
-        print("--- [Auto-Hop] 2 Phut - Dang doi Server cung Sea ---")
-        ForceSeaHop()
+        SuperCleanHop()
     end
 end)
 
--- 2. XỬ LÝ LỖI 773 VÀ CÁC LỖI DỊCH CHUYỂN KHÁC (NHẢY LẠI NGAY)
-GuiService.ErrorMessageChanged:Connect(function()
-    local msg = GuiService:GetErrorMessage()
-    if msg ~= "" then
-        warn("Phat hien loi: " .. msg)
-        task.wait(2) -- Nghỉ 2s để hệ thống reset rồi nhảy lại
-        ForceSeaHop()
-    end
-end)
-
--- 3. QUÉT BẢNG "DỊCH CHUYỂN THẤT BẠI" ĐỂ TỰ ĐỘNG BẤM OK/NHẢY TIẾP
+-- 4. VÒNG LẶP KIỂM TRA LỖI (0.5 GIÂY/LẦN) - NẾU THẤY LỖI 773 LÀ DIỆT NGAY
 task.spawn(function()
     while task.wait(0.5) do
-        local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
-        if prompt then
-            ForceSeaHop()
+        if GuiService:GetErrorMessage() ~= "" or game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true) then
+            SuperCleanHop()
         end
     end
 end)
 
-print("--- [Gemini] V16 SEA-CHECK ACTIVE - CHONG LOI 773 ---")
+print("--- [Gemini] V18 ANTI-UI: DA KICH HOAT ---")
