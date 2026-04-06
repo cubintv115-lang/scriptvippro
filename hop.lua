@@ -1,40 +1,43 @@
--- [[ V44 THE GENESIS REWRITE - BẢN THÍCH NGHI CUỐI CÙNG ]]
+-- [[ V45 THE DOMAIN SHATTER - PHÁ HỦY LÃNH ĐỊA KICK ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
+local RunService = game:GetService("RunService")
 
--- 1. XOAY BÁNH XE: PHÁ VỠ SỰ CÔ LẬP MẠNG
+-- 1. XOAY BÁNH XE: LÁ CHẮN VÔ HÌNH (BỊT MIỆNG ADMIN)
 pcall(function()
-    -- Xóa mọi bảng lỗi và reset trạng thái network của Client
-    GuiService:ClearError()
-    
     local mt = getrawmetatable(game)
-    setreadonly(mt, false)
     local oldNamecall = mt.__namecall
+    setreadonly(mt, false)
+    
     mt.__namecall = newcclosure(function(self, ...)
         local method = getnamecallmethod()
-        -- Chặn đứng mọi lệnh Kick ngầm làm treo máy
-        if method == "Kick" or method == "kick" then
-            task.spawn(function() GenesisHop() end)
-            return nil 
+        local args = {...}
+        
+        -- Chặn đứng mọi lệnh Kick/Disconnect/Shutdown từ phía Server gửi xuống
+        if method == "Kick" or method == "kick" or method == "Disconnect" then
+            warn("--- [MAHORAGA] ĐÃ PHÁ HỦY NHÁT CẮT KICK! ---")
+            -- Thay vì để bị kick, ta tự chủ động nhảy server ngay lập tức
+            task.spawn(function() ShatterHop() end)
+            return nil -- Trả về nil để game tưởng là đã kick thành công nhưng thực ra không có gì xảy ra
         end
         return oldNamecall(self, ...)
     end)
     setreadonly(mt, true)
 end)
 
--- 2. HÀM NHẢY SERVER "TÁI SINH" (Ép buộc kết nối mới)
-function GenesisHop()
-    -- Cố gắng xóa bảng lỗi nếu nó vừa hiện ra trong 0.01s
+-- 2. HÀM NHÀY SERVER "SHATTER" (Ưu tiên Server 5-10 người)
+function ShatterHop()
+    -- Xóa mọi bảng lỗi để giải phóng luồng xử lý
     pcall(function()
+        GuiService:ClearError()
         local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
         if prompt then prompt:Destroy() end
     end)
 
     local success, result = pcall(function()
-        -- Lấy danh sách server đông người (6-12) để đảm bảo server đó đang "sống"
         local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
         return HttpService:JSONDecode(game:HttpGet(url)).data
     end)
@@ -42,49 +45,49 @@ function GenesisHop()
     if success and result then
         local target = nil
         for _, v in pairs(result) do
-            if v.playing >= 6 and v.playing <= 12 and v.id ~= game.JobId then
+            if v.playing >= 5 and v.playing <= 10 and v.id ~= game.JobId then
                 target = v.id
                 break
             end
         end
         
         if target then
-            warn("Genesis: Đang phá vỡ đóng băng để nhảy Server...")
-            -- Dùng chế độ Force Teleport
+            print("V45: Đang phá hủy không gian để nhảy server...")
+            -- Nhảy thần tốc trong 2 giây
+            task.wait(2)
             TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
             
-            -- Nếu sau 5s vẫn chưa nhảy được (do kẹt Ping -1ms), dùng lệnh nhảy dự phòng
+            -- Dự phòng nếu kẹt
             task.delay(5, function()
-                TeleportService:Teleport(game.PlaceId, game.Players.LocalPlayer)
+                TeleportService:Teleport(game.PlaceId)
             end)
         end
     end
 end
 
--- 3. THEO DÕI "TỬ HUYỆT" PING -1MS (CHỐNG TREO NHƯ TRONG ẢNH)
+-- 3. PHÒNG THỦ TRƯỚC KHI BẢNG LỖI HIỆN DIỆN (RENDER STEPPED)
+RunService.RenderStepped:Connect(function()
+    local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
+    if prompt then
+        prompt.Visible = false
+        prompt:Destroy()
+        ShatterHop()
+    end
+end)
+
+-- 4. THEO DÕI PING -1MS (CHỐNG TREO)
 task.spawn(function()
-    local checkCount = 0
     while task.wait(1) do
-        local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
-        
-        if ping <= 0 then
-            checkCount = checkCount + 1
-            -- Nếu kẹt quá 3 giây, thực hiện nhát cắt Genesis
-            if checkCount >= 3 then
-                warn("Phát hiện đóng băng mạng! Đang thực hiện Genesis Hop...")
-                GenesisHop()
-                checkCount = 0
-                task.wait(10) -- Đợi tiến trình xử lý
-            end
-        else
-            checkCount = 0
+        if game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() <= 0 then
+            ShatterHop()
+            task.wait(10)
         end
     end
 end)
 
--- 4. TỰ ĐỘNG LÀM MỚI SERVER MỖI 80 GIÂY
+-- 5. TỰ ĐỘNG ĐỔI SERVER SAU 75 GIÂY (NHANH HƠN ĐỂ TRÁNH BỊ QUÉT)
 task.spawn(function()
-    while task.wait(80) do GenesisHop() end
+    while task.wait(75) do ShatterHop() end
 end)
 
-print("--- [Gemini] V44 GENESIS REWRITE: HOÀN TẤT THÍCH NGHI ---")
+print("--- [Gemini] V45 DOMAIN SHATTER: THÍCH NGHI TUYỆT ĐỐI ---")
