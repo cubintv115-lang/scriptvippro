@@ -1,64 +1,80 @@
--- [[ V14 EMERGENCY EXIT - NHẢY TỨC THÌ & CHỐNG MẤT KẾT NỐI ]]
+-- [[ V15 BLACK HOLE - ULTIMATE FORCE JOIN & ANTI-KICK ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 
--- Hàm tìm Server "Sạch" (Tránh tuyệt đối lỗi Reconnect Unsuccessful)
-local function EmergencyHop()
-    local PlaceId = game.PlaceId
-    local success, result = pcall(function()
-        -- Lấy danh sách server sắp xếp từ vắng nhất đến đầy nhất
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
-    end)
-    
-    if success and result then
-        local safeServers = {}
+local ReservedServer = nil
+
+-- HÀM 1: LUÔN LUÔN LẤY SẴN 1 SERVER DỰ PHÒNG (PRE-FETCH)
+local function UpdateReservedServer()
+    pcall(function()
+        local result = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+        local safe = {}
         for _, v in pairs(result) do
-            -- CHỈ CHỌN server trống ít nhất 5-7 chỗ (Cực kỳ quan trọng để không bị lỗi kết nối)
-            if v.playing < (v.maxPlayers - 5) and v.id ~= game.JobId then
-                table.insert(safeServers, v.id)
+            -- Chỉ lấy server cực vắng (trống 8 chỗ) để đảm bảo KHÔNG BAO GIỜ lỗi kết nối
+            if v.playing < (v.maxPlayers - 8) and v.id ~= game.JobId then
+                table.insert(safe, v.id)
             end
         end
-        
-        if #safeServers > 0 then
-            local target = safeServers[math.random(1, #safeServers)]
-            -- Bắn lệnh nhảy 5 lần liên tục để ép hệ thống thực hiện trước khi script bị đóng băng
-            for i = 1, 5 do
-                TeleportService:TeleportToPlaceInstance(PlaceId, target, game.Players.LocalPlayer)
-                task.wait(0.05)
-            end
-        else
-            TeleportService:Teleport(PlaceId)
+        if #safe > 0 then
+            ReservedServer = safe[math.random(1, #safe)]
         end
+    end)
+end
+
+-- Cập nhật "vé dự phòng" mỗi 30 giây
+task.spawn(function()
+    while task.wait(30) do
+        UpdateReservedServer()
+    end
+end)
+UpdateReservedServer() -- Chạy lần đầu
+
+-- HÀM 2: ÉP NHẢY NGAY LẬP TỨC (DÙNG VÉ CÓ SẴN)
+local function InstantBlackHoleHop()
+    if ReservedServer then
+        -- Nhảy liên tục 10 lần (Spam cực mạnh trong 0.1 giây)
+        for i = 1, 10 do
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, ReservedServer, Players.LocalPlayer)
+        end
+    else
+        -- Nếu chưa kịp có vé dự phòng, nhảy đại theo PlaceId
+        TeleportService:Teleport(game.PlaceId)
     end
 end
 
--- 1. TỰ ĐỘNG NHẢY SAU 2 PHÚT (NHƯ BẠN MUỐN)
+-- 1. CHẾ ĐỘ 2 PHÚT TỰ ĐỔI SERVER (NHƯ Ý BẠN)
 task.spawn(function()
     while task.wait(120) do
-        EmergencyHop()
+        InstantBlackHoleHop()
     end
 end)
 
--- 2. PHẢN XẠ TỨC THÌ KHI BỊ KICK (BẮT TÍN HIỆU TỪ LÕI GAME)
+-- 2. PHẢN XẠ "TỬ THẦN": NHẢY KHI THẤY BẤT KỲ LỖI NÀO
 GuiService.ErrorMessageChanged:Connect(function()
     if GuiService:GetErrorMessage() ~= "" then
-        -- Khi bị kick, nhảy ngay lập tức không chờ đợi
-        EmergencyHop()
+        InstantBlackHoleHop()
     end
 end)
 
--- 3. CHỐNG TREO MÀN HÌNH XÁM (BẮT GUI LỖI TRONG 0.1 GIÂY)
+-- 3. QUÉT CORE GUI SIÊU TỐC (0.05 GIÂY)
 task.spawn(function()
-    while task.wait(0.1) do
-        local coreGui = game:GetService("CoreGui")
-        if coreGui:FindFirstChild("ErrorMessagePrompt", true) then
-            EmergencyHop()
+    while task.wait(0.05) do
+        if game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true) then
+            InstantBlackHoleHop()
             break
         end
     end
 end)
 
-print("--- [Gemini] V14 EMERGENCY EXIT: DA SAN SANG ---")
+-- 4. TỰ ĐỘNG BẤM NÚT RECONNECT NGẦM (DÙNG VIRTUAL INPUT)
+game:GetService("CoreGui").ChildAdded:Connect(function(child)
+    if child.Name == "ErrorMessagePrompt" then
+        InstantBlackHoleHop()
+    end
+end)
+
+print("--- [Gemini] V15 BLACK HOLE: KHOA MUC TIEU SAN SANG ---")
