@@ -1,62 +1,39 @@
--- [[ V13 SONIC HOP & HYPER SPAM - BY GEMINI ]]
-repeat task.wait() until game:IsLoaded()
-
+-- Script tự động nhảy sang máy chủ mục tiêu khi bị kick hoặc tự chọn theo yêu cầu
 local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
-local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
--- Hàm tìm Server cực vắng và thực hiện ép nhảy (Ưu tiên tốc độ)
-local function ForceServerHop()
-    local success, result = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")).data
-    end)
-    
-    if success and result then
-        local targetServers = {}
-        for _, v in pairs(result) do
-            -- Với tốc độ 1 phút, mình chọn server trống 3 chỗ để tìm nhanh hơn
-            if v.playing < (v.maxPlayers - 3) and v.id ~= game.JobId then
-                table.insert(targetServers, v.id)
-            end
-        end
-        
-        if #targetServers > 0 then
-            local targetId = targetServers[math.random(1, #targetServers)]
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, targetId, Players.LocalPlayer)
-        else
-            TeleportService:Teleport(game.PlaceId)
-        end
+-- ─── THÔNG TIN MÁY CHỦ MỤC TIÊU ───
+-- Thay thế bằng ID Place của server Blox Fruit (thường là 123456789)
+local TARGET_PLACE_ID = 123456789
+-- Để trống TARGET_JOB_ID nếu muốn nhảy vào server ngẫu nhiên
+-- Hoặc điền ID phòng cụ thể nếu muốn nhảy vào 1 phòng riêng
+local TARGET_JOB_ID = ""
+
+-- ─── Tự động nhảy khi bị kick khỏi game ───
+local function autoTeleport()
+    -- Chờ 2 giây để tránh bị phát hiện quá nhanh
+    task.wait(2)
+    if TARGET_JOB_ID ~= "" then
+        -- Nhảy vào phòng cụ thể
+        TeleportService:TeleportToPlaceInstance(TARGET_PLACE_ID, TARGET_JOB_ID, LocalPlayer)
+    else
+        -- Nhảy vào server ngẫu nhiên của cùng game
+        TeleportService:Teleport(TARGET_PLACE_ID, LocalPlayer)
     end
+    print(string.format("Đã tự động nhảy sang server: %s", TARGET_JOB_ID ~= "" and TARGET_JOB_ID or "server ngẫu nhiên"))
 end
 
--- 1. CHẾ ĐỘ TỰ ĐỘNG ĐỔI SERVER SAU 1 PHÚT (60 GIÂY)
-task.spawn(function()
-    while task.wait(60) do -- Đã chỉnh xuống 1 phút theo ý bạn
-        print("Da den 1 phut, dang tu dong doi Server de san muc tieu moi...")
-        ForceServerHop()
+-- Lắng nghe sự kiện bị kick
+LocalPlayer.OnTeleport:Connect(function(teleportState)
+    if teleportState == Enum.TeleportState.Failed then
+        autoTeleport()
     end
 end)
 
--- 2. CHẾ ĐỘ KIỂM TRA LỖI SIÊU TỐC (0.5 GIÂY)
-task.spawn(function()
-    while task.wait(0.5) do
-        local hasError = GuiService:GetErrorMessage() ~= "" 
-        local hasPrompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
-        
-        if hasError or hasPrompt then
-            ForceServerHop()
-            task.wait(2) -- Nghỉ ngắn để tiếp tục nã lệnh nếu chưa nhảy được
-        end
+-- Kiểm tra liên tục nếu bị kick ra khỏi game
+while task.wait(5) do
+    if not LocalPlayer:IsDescendantOf(game) then
+        autoTeleport()
     end
-end)
-
--- 3. CHỐNG TREO LOADING (Nếu load server quá 15s không xong thì nhảy tiếp)
-task.spawn(function()
-    task.wait(15)
-    if #Players:GetPlayers() <= 1 then
-        ForceServerHop()
-    end
-end)
-
-print("--- [Gemini] V13 SONIC: AUTO HOP 1 MIN ACTIVE ---")
+end
