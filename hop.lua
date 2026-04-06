@@ -1,68 +1,79 @@
--- [[ V31 THE SINGULARITY - GIẢI PHÁP CUỐI CÙNG CHO DELTA & LURAPH ]]
+-- [[ V33 MAHORAGA ADAPTATION - THÍCH NGHI TỐI THƯỢNG ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 
--- 1. TỐI ƯU HÓA HỆ THỐNG ĐỂ GIẢM TẢI (TRÁNH FREEZE DELTA)
-setfpscap(10) -- Ép FPS xuống 10 để dành RAM cho việc Teleport khi bị Kick
-settings().Physics.PhysicsEnvironmentalThrottle = 1 -- Giảm tải vật lý
+-- 1. XOAY BÁNH XE: CHẶN MỌI ĐÒN ĐÁNH (KICK/DISCONNECT)
+local function Adapt()
+    local mt = getrawmetatable(game)
+    local old = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "Kick" or method == "kick" or method == "Disconnect" then
+            warn("--- [MAHORAGA] DA THICH NGHI VOI LENH KICK! ---")
+            return nil 
+        end
+        return old(self, ...)
+    end)
+    setreadonly(mt, true)
+end
+pcall(Adapt)
 
--- 2. HÀM LẤY SERVER "SIÊU TRỐNG" (ƯU TIÊN SERVER 1-2 NGƯỜI)
-local function GetEmptyServer()
+-- 2. HÀM NHẢY SERVER (KỸ THUẬT PHÁT ĐẢO LỖI 773)
+local function UltimateHop()
+    -- Xóa bảng lỗi ngay lập tức
+    pcall(function()
+        local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
+        if prompt then prompt:Destroy() end
+    end)
+
     local success, result = pcall(function()
+        -- Lấy server vắng nhất (1-2 người)
         return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
     end)
+
     if success and result then
+        local target = nil
         for _, v in pairs(result) do
-            if v.playing < 3 and v.id ~= game.JobId then return v.id end
+            if v.playing < 3 and v.id ~= game.JobId then
+                target = v.id
+                break
+            end
         end
-    end
-    return nil
-end
-
--- 3. KỸ THUẬT "NHẢY TRƯỚC KHI CHẾT" (PRE-KICK JUMP)
-local function SingularityJump()
-    local target = GetEmptyServer()
-    if target then
-        -- Xóa bảng lỗi (nếu có)
-        pcall(function()
-            game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true):Destroy()
-        end)
         
-        -- Nhảy ngay lập tức, không chờ đợi
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
-        
-        -- Nếu sau 5 giây không nhảy được, thử lại bằng cách nhảy ngẫu nhiên
-        task.delay(5, function()
-            TeleportService:Teleport(game.PlaceId)
-        end)
+        if target then
+            print("Mahoraga: Dang nhay sang server moi sau 12s thich nghi...")
+            task.wait(12) -- Thơi gian "xoay bánh xe" để Roblox không nhận diện IP
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
+        end
     end
 end
 
--- 4. THEO DÕI "DẤU HIỆU SINH TỒN" CỦA KẾT NỐI
--- Thay vì đợi bảng lỗi, ta theo dõi Ping. Nếu Ping đứng im quá lâu = Bị Kick/Freeze
-local lastPing = 0
-task.spawn(function()
-    while task.wait(2) do
-        local currentPing = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
-        if currentPing == lastPing and lastPing ~= 0 then
-            warn("Phat hien Freeze! Dang nhay server khan cap...")
-            SingularityJump()
-        end
-        lastPing = currentPing
-    end
-end)
-
--- 5. CHẶN KICK VÀO LỖI UI (DÙNG CHO DELTA)
+-- 3. THÍCH NGHI VỚI LỖI MẤT KẾT NỐI (REJOIN TRỰC TIẾP)
 GuiService.ErrorMessageChanged:Connect(function()
-    SingularityJump()
+    if GuiService:GetErrorMessage() ~= "" then
+        warn("Phat hien don danh moi! Dang thich nghi...")
+        UltimateHop()
+    end
 end)
 
--- 6. TỰ ĐỘNG NHẢY ĐỊNH KỲ (ĐỂ TRÁNH BỊ SCRIPT BOUNTY 'SOI')
+-- 4. QUÉT SIÊU TỐC 0.1S (KHÔNG CHO BẢNG LỖI HIỆN DIỆN)
 task.spawn(function()
-    while task.wait(120) do SingularityJump() end
+    while task.wait(0.1) do
+        if game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true) then
+            UltimateHop()
+        end
+    end
 end)
 
-print("--- [Gemini] V31 THE SINGULARITY ACTIVE ---")
+-- 5. TỰ ĐỘNG ĐỔI SERVER ĐỊNH KỲ (MỖI 2 PHÚT)
+task.spawn(function()
+    while task.wait(120) do
+        UltimateHop()
+    end
+end)
+
+print("--- [Gemini] V33 MAHORAGA ACTIVE: BAN DA THICH NGHI VOI MOI LOI ---")
