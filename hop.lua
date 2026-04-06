@@ -1,29 +1,40 @@
--- [[ V37 THE UNTOUCHABLE - CHIẾN THUẬT THÍCH NGHI CUỐI CÙNG ]]
+-- [[ V38 THE VOID ADAPTATION - THÍCH NGHI VỚI PING -1MS & SECURITY KICK ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 
--- 1. XOAY BÁNH XE: VÔ HIỆU HÓA HOÀN TOÀN CƠ CHẾ HIỂN THỊ LỖI
--- (Khiến Roblox không thể đóng băng app bằng bảng thông báo)
+-- 1. XOAY BÁNH XE: VÔ HIỆU HÓA TOÀN BỘ HỆ THỐNG KICK & UI LỖI
 pcall(function()
-    local coreGui = game:GetService("CoreGui")
-    coreGui.DescendantAdded:Connect(function(child)
+    local mt = getrawmetatable(game)
+    local old = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if method == "Kick" or method == "kick" then
+            warn("--- [V38] ĐÃ CHẶN ĐỨNG LỆNH SECURITY KICK! ---")
+            return nil 
+        end
+        return old(self, ...)
+    end)
+    setreadonly(mt, true)
+
+    -- Xóa sổ bảng lỗi ngay khi nó định hiện lên (Tránh treo Delta)
+    game:GetService("CoreGui").DescendantAdded:Connect(function(child)
         if child.Name == "ErrorMessagePrompt" or child.Name == "ErrorPrompt" then
             child.Visible = false
-            task.defer(function() child:Destroy() end)
+            game:Debris:AddItem(child, 0)
         end
     end)
 end)
 
--- 2. HÀM NHẢY SERVER "GHOST STEP" (Lách lỗi 773)
-local function GhostStepHop()
-    -- Ép hệ thống xóa trạng thái lỗi cũ
+-- 2. HÀM NHẢY SERVER "GHOST STEP" (Sửa lỗi 773 & Reconnect)
+local function VoidHop()
     pcall(function() GuiService:ClearError() end)
 
     local success, result = pcall(function()
-        -- Tìm server CHỈ CÓ 1 NGƯỜI (Tránh tuyệt đối việc server đầy hoặc lỗi kết nối)
+        -- Tìm server CHỈ CÓ 1 NGƯỜI (Cách duy nhất để không bị lỗi kết nối lại)
         local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
         return HttpService:JSONDecode(game:HttpGet(url)).data
     end)
@@ -38,38 +49,28 @@ local function GhostStepHop()
         end
         
         if target then
-            print("Mahoraga: Thich nghi thanh cong! Dang vao server moi...")
-            -- Nghỉ 15 giây (Khoảng thời gian vàng để Roblox gỡ Blacklist IP tạm thời)
-            task.wait(15)
+            print("V38: Đang thực hiện nhát cắt không gian sang Server mới...")
+            task.wait(10) -- Khoảng nghỉ để reset Session
             TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
         else
-            -- Nếu không có server 1 người, nhảy ngẫu nhiên để thoát kẹt
             TeleportService:Teleport(game.PlaceId)
         end
     end
 end
 
--- 3. THEO DÕI "MẤT KẾT NỐI" (DÙNG CHO LỖI 773 TRONG ẢNH)
-GuiService.ErrorMessageChanged:Connect(function()
-    local msg = GuiService:GetErrorMessage()
-    if msg ~= "" then
-        warn("Phat hien don danh: " .. msg .. "! Dang xoay banh xe...")
-        GhostStepHop()
-    end
-end)
-
--- 4. QUÉT PING -1MS (CHỐNG FREEZE TRƯỚC KHI BỊ KICK)
+-- 3. THEO DÕI PING -1MS (RADAR CỦA MAHORAGA)
 task.spawn(function()
     local freezeCount = 0
     while task.wait(1) do
         local stats = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]
         local ping = stats:GetValue()
         
+        -- Nếu Ping rơi xuống -1 hoặc đứng im (0), lập tức nhảy server
         if ping <= 0 then
             freezeCount = freezeCount + 1
             if freezeCount >= 3 then
-                warn("Game dung hinh! Dang nhay server khẩn cấp...")
-                GhostStepHop()
+                warn("Phat hien Network Freeze! Dang giai cuu...")
+                VoidHop()
                 freezeCount = 0
             end
         else
@@ -78,9 +79,16 @@ task.spawn(function()
     end
 end)
 
--- 5. TỰ ĐỘNG ĐỔI SERVER SAU 90 GIÂY
-task.spawn(function()
-    while task.wait(90) do GhostStepHop() end
+-- 4. PHẢN XẠ KHI MẤT KẾT NỐI (LỖI 773)
+GuiService.ErrorMessageChanged:Connect(function()
+    if GuiService:GetErrorMessage() ~= "" then
+        VoidHop()
+    end
 end)
 
-print("--- [V37] MAHORAGA DA THICH NGHI HOAN TOAN ---")
+-- 5. TỰ ĐỘNG ĐỔI SERVER ĐỊNH KỲ (MỖI 90 GIÂY)
+task.spawn(function()
+    while task.wait(90) do VoidHop() end
+end)
+
+print("--- [V38] MAHORAGA ĐÃ THÍCH NGHI XONG ---")
