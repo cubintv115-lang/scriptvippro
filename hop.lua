@@ -1,36 +1,33 @@
--- [[ V13 NEURAL LINK - INSTANT REACTION HOP ]]
+-- [[ V14 EMERGENCY EXIT - NHẢY TỨC THÌ & CHỐNG MẤT KẾT NỐI ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
-local Players = game:GetService("Players")
 
--- Tối ưu bộ nhớ để lệnh nhảy chạy nhanh hơn
-local PlaceId = game.PlaceId
-local LocalPlayer = Players.LocalPlayer
-
-local function SuperFastHop()
-    -- Lấy danh sách server vắng cực nhanh
+-- Hàm tìm Server "Sạch" (Tránh tuyệt đối lỗi Reconnect Unsuccessful)
+local function EmergencyHop()
+    local PlaceId = game.PlaceId
     local success, result = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")).data
+        -- Lấy danh sách server sắp xếp từ vắng nhất đến đầy nhất
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
     end)
     
     if success and result then
-        local targetServers = {}
+        local safeServers = {}
         for _, v in pairs(result) do
-            -- Lọc server trống 3-5 chỗ để đảm bảo vào được ngay
-            if v.playing < (v.maxPlayers - 3) and v.id ~= game.JobId then
-                table.insert(targetServers, v.id)
+            -- CHỈ CHỌN server trống ít nhất 5-7 chỗ (Cực kỳ quan trọng để không bị lỗi kết nối)
+            if v.playing < (v.maxPlayers - 5) and v.id ~= game.JobId then
+                table.insert(safeServers, v.id)
             end
         end
         
-        if #targetServers > 0 then
-            local targetId = targetServers[math.random(1, #targetServers)]
-            -- Bắn lệnh Teleport liên tục 3 lần để ép hệ thống nhận diện
-            for i = 1, 3 do
-                TeleportService:TeleportToPlaceInstance(PlaceId, targetId, LocalPlayer)
-                task.wait(0.1)
+        if #safeServers > 0 then
+            local target = safeServers[math.random(1, #safeServers)]
+            -- Bắn lệnh nhảy 5 lần liên tục để ép hệ thống thực hiện trước khi script bị đóng băng
+            for i = 1, 5 do
+                TeleportService:TeleportToPlaceInstance(PlaceId, target, game.Players.LocalPlayer)
+                task.wait(0.05)
             end
         else
             TeleportService:Teleport(PlaceId)
@@ -38,36 +35,30 @@ local function SuperFastHop()
     end
 end
 
--- 1. BẮT TÍN HIỆU KICK TRƯỚC KHI BẢNG HIỆN (NETWORK SIGNAL)
-GuiService.ErrorMessageChanged:Connect(function()
-    if GuiService:GetErrorMessage() ~= "" then
-        SuperFastHop()
-    end
-end)
-
--- 2. BẮT TÍN HIỆU KICK TỪ GUI (CORE GUI INJECTION)
-game:GetService("CoreGui").ChildAdded:Connect(function(child)
-    if child.Name == "ErrorMessagePrompt" or child.Name == "ErrorPrompt" then
-        SuperFastHop()
-    end
-end)
-
--- 3. CHẾ ĐỘ TỰ ĐỘNG NHẢY MỖI 2 PHÚT (NHƯ BẠN YÊU CẦU)
+-- 1. TỰ ĐỘNG NHẢY SAU 2 PHÚT (NHƯ BẠN MUỐN)
 task.spawn(function()
     while task.wait(120) do
-        print("--- [Auto-Hop] 2 Phut Da Het, Doi Server Moi ---")
-        SuperFastHop()
+        EmergencyHop()
     end
 end)
 
--- 4. SPAM KIỂM TRA MỖI 0.1 GIÂY (PHÒNG TRƯỜNG HỢP EXECUTOR BỊ ĐƠ)
+-- 2. PHẢN XẠ TỨC THÌ KHI BỊ KICK (BẮT TÍN HIỆU TỪ LÕI GAME)
+GuiService.ErrorMessageChanged:Connect(function()
+    if GuiService:GetErrorMessage() ~= "" then
+        -- Khi bị kick, nhảy ngay lập tức không chờ đợi
+        EmergencyHop()
+    end
+end)
+
+-- 3. CHỐNG TREO MÀN HÌNH XÁM (BẮT GUI LỖI TRONG 0.1 GIÂY)
 task.spawn(function()
     while task.wait(0.1) do
-        if GuiService:GetErrorMessage() ~= "" then
-            SuperFastHop()
-            break -- Thoát vòng lặp khi đã kích hoạt nhảy
+        local coreGui = game:GetService("CoreGui")
+        if coreGui:FindFirstChild("ErrorMessagePrompt", true) then
+            EmergencyHop()
+            break
         end
     end
 end)
 
-print("--- [Gemini] V13 NEURAL LINK: INSTANT HOP ACTIVE ---")
+print("--- [Gemini] V14 EMERGENCY EXIT: DA SAN SANG ---")
