@@ -1,39 +1,73 @@
--- Script tự động nhảy sang máy chủ mục tiêu khi bị kick hoặc tự chọn theo yêu cầu
+-- [[ V13 NEURAL LINK - INSTANT REACTION HOP ]]
+repeat task.wait() until game:IsLoaded()
+
 local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+
+-- Tối ưu bộ nhớ để lệnh nhảy chạy nhanh hơn
+local PlaceId = game.PlaceId
 local LocalPlayer = Players.LocalPlayer
 
--- ─── THÔNG TIN MÁY CHỦ MỤC TIÊU ───
--- Thay thế bằng ID Place của server Blox Fruit (thường là 123456789)
-local TARGET_PLACE_ID = 123456789
--- Để trống TARGET_JOB_ID nếu muốn nhảy vào server ngẫu nhiên
--- Hoặc điền ID phòng cụ thể nếu muốn nhảy vào 1 phòng riêng
-local TARGET_JOB_ID = ""
-
--- ─── Tự động nhảy khi bị kick khỏi game ───
-local function autoTeleport()
-    -- Chờ 2 giây để tránh bị phát hiện quá nhanh
-    task.wait(2)
-    if TARGET_JOB_ID ~= "" then
-        -- Nhảy vào phòng cụ thể
-        TeleportService:TeleportToPlaceInstance(TARGET_PLACE_ID, TARGET_JOB_ID, LocalPlayer)
-    else
-        -- Nhảy vào server ngẫu nhiên của cùng game
-        TeleportService:Teleport(TARGET_PLACE_ID, LocalPlayer)
+local function SuperFastHop()
+    -- Lấy danh sách server vắng cực nhanh
+    local success, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")).data
+    end)
+    
+    if success and result then
+        local targetServers = {}
+        for _, v in pairs(result) do
+            -- Lọc server trống 3-5 chỗ để đảm bảo vào được ngay
+            if v.playing < (v.maxPlayers - 3) and v.id ~= game.JobId then
+                table.insert(targetServers, v.id)
+            end
+        end
+        
+        if #targetServers > 0 then
+            local targetId = targetServers[math.random(1, #targetServers)]
+            -- Bắn lệnh Teleport liên tục 3 lần để ép hệ thống nhận diện
+            for i = 1, 3 do
+                TeleportService:TeleportToPlaceInstance(PlaceId, targetId, LocalPlayer)
+                task.wait(0.1)
+            end
+        else
+            TeleportService:Teleport(PlaceId)
+        end
     end
-    print(string.format("Đã tự động nhảy sang server: %s", TARGET_JOB_ID ~= "" and TARGET_JOB_ID or "server ngẫu nhiên"))
 end
 
--- Lắng nghe sự kiện bị kick
-LocalPlayer.OnTeleport:Connect(function(teleportState)
-    if teleportState == Enum.TeleportState.Failed then
-        autoTeleport()
+-- 1. BẮT TÍN HIỆU KICK TRƯỚC KHI BẢNG HIỆN (NETWORK SIGNAL)
+GuiService.ErrorMessageChanged:Connect(function()
+    if GuiService:GetErrorMessage() ~= "" then
+        SuperFastHop()
     end
 end)
 
--- Kiểm tra liên tục nếu bị kick ra khỏi game
-while task.wait(5) do
-    if not LocalPlayer:IsDescendantOf(game) then
-        autoTeleport()
+-- 2. BẮT TÍN HIỆU KICK TỪ GUI (CORE GUI INJECTION)
+game:GetService("CoreGui").ChildAdded:Connect(function(child)
+    if child.Name == "ErrorMessagePrompt" or child.Name == "ErrorPrompt" then
+        SuperFastHop()
     end
-end
+end)
+
+-- 3. CHẾ ĐỘ TỰ ĐỘNG NHẢY MỖI 2 PHÚT (NHƯ BẠN YÊU CẦU)
+task.spawn(function()
+    while task.wait(120) do
+        print("--- [Auto-Hop] 2 Phut Da Het, Doi Server Moi ---")
+        SuperFastHop()
+    end
+end)
+
+-- 4. SPAM KIỂM TRA MỖI 0.1 GIÂY (PHÒNG TRƯỜNG HỢP EXECUTOR BỊ ĐƠ)
+task.spawn(function()
+    while task.wait(0.1) do
+        if GuiService:GetErrorMessage() ~= "" then
+            SuperFastHop()
+            break -- Thoát vòng lặp khi đã kích hoạt nhảy
+        end
+    end
+end)
+
+print("--- [Gemini] V13 NEURAL LINK: INSTANT HOP ACTIVE ---")
