@@ -1,17 +1,30 @@
--- [[ V23 GHOST PROTOCOL - VƯỢT RÀO 267 & 773 TRIỆT ĐỂ ]]
+-- [[ V24 THE OVERRIDER - CHẶN ĐỨNG LỆNH KICK & FIX LỖI 773 ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 
--- Hàm lấy Server vắng cực độ (15+ chỗ trống)
-local function GetGhostServer()
+-- 1. KỸ THUẬT QUAN TRỌNG: BỊT MIỆNG LỆNH KICK
+-- Script này sẽ chặn đứng mọi nỗ lực Kick bạn ra khỏi game từ các script khác
+local oldKick
+oldKick = hookmetamethod(game:GetService("Players").LocalPlayer, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    if method == "Kick" or method == "kick" then
+        print("--- [Gemini] Da chan dung mot lenh Kick tu Script Bounty! ---")
+        return nil -- Từ chối lệnh Kick, không cho bảng lỗi hiện lên
+    end
+    return oldKick(self, ...)
+end)
+
+-- 2. HÀM NHẢY SERVER AN TOÀN (LỌC SEA CHUẨN 100%)
+local function GetCleanServer()
     local success, result = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")).data
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
     end)
     if success and result then
         local safe = {}
         for _, v in pairs(result) do
+            -- Chỉ chọn server trống ít nhất 15 chỗ
             if v.playing < (v.maxPlayers - 15) and v.id ~= game.JobId then
                 table.insert(safe, v.id)
             end
@@ -21,55 +34,32 @@ local function GetGhostServer()
     return nil
 end
 
-local function ExecGhostJump()
-    -- 1. XÓA BẢNG LỖI ĐỂ GIẢI PHÓNG ĐÓNG BĂNG
-    pcall(function()
-        local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
-        if prompt then prompt:Destroy() end
-    end)
-
-    -- 2. ĐẶT LỆNH NHẢY VÀO HÀNG CHỜ (QUEUE)
-    -- Đây là kỹ thuật giúp lệnh nhảy tồn tại KỂ CẢ KHI BẠN BỊ KICK
-    local target = GetGhostServer()
+local function ExecPowerHop()
+    local target = GetCleanServer()
     if target then
-        local code = [[
-            local ts = game:GetService("TeleportService")
-            local p = game:GetService("Players").LocalPlayer
-            ts:TeleportToPlaceInstance(]]..game.PlaceId..[[, "]]..target..[[", p)
-        ]]
-        
-        -- Thử dùng QueueTeleport nếu Executor hỗ trợ (Delta thường hỗ trợ)
-        if queue_on_teleport then
-            queue_on_teleport(code)
-        end
-        
-        -- 3. NGHỈ 15 GIÂY ĐỂ ROBLOX RESET TRẠNG THÁI SECURITY
-        print("GHOST PROTOCOL: Dang cho 15s de xoa Blacklist...")
-        task.wait(15)
-        
+        -- Đợi 10 giây để "làm nguội" hệ thống tránh lỗi 773
+        print("Dang lam nguoi he thong 10s...")
+        task.wait(10)
         TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
     end
 end
 
--- TỰ ĐỘNG NHẢY MỖI 2 PHÚT ĐỂ TRÁNH BỊ SOI
+-- 3. TỰ ĐỘNG ĐỔI SERVER SAU 2 PHÚT
 task.spawn(function()
-    while task.wait(120) do ExecGhostJump() end
-end)
-
--- PHẢN XẠ KHI THẤY BẢNG LỖI 267 HOẶC 773
-game:GetService("GuiService").ErrorMessageChanged:Connect(function()
-    if game:GetService("GuiService"):GetErrorMessage() ~= "" then
-        ExecGhostJump()
+    while task.wait(120) do
+        ExecPowerHop()
     end
 end)
 
--- QUÉT LIÊN TỤC 1S/LẦN ĐỂ DIỆT BẢNG LỖI
+-- 4. PHÒNG TUYẾN CUỐI CÙNG: NẾU VẪN THẤY BẢNG LỖI HIỆN LÊN
 task.spawn(function()
     while task.wait(1) do
-        if game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true) then
-            ExecGhostJump()
+        local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
+        if prompt then
+            prompt:Destroy() -- Xóa sổ bảng lỗi
+            ExecPowerHop()
         end
     end
 end)
 
-print("--- [Gemini] V23 GHOST PROTOCOL ACTIVE ---")
+print("--- [Gemini] V24 OVERRIDER ACTIVE - KICK IS DISABLED ---")
