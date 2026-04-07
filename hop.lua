@@ -1,4 +1,4 @@
--- [[ V52 THE UNLIMITED VOID BREAKER - PHÁ GIẢI KICK & TREO MÁY ]]
+-- [[ V53 THE WORLD REBIRTH - ÉP NHẢY SERVER KHI PING -1MS ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
@@ -6,9 +6,9 @@ local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 
--- 1. HÀM NHẢY SERVER "SIÊU VIỆT" (BYPASS MỌI TRẠNG THÁI)
-local function VoidBreakerHop()
-    -- Xóa mọi bảng lỗi ngay lập tức để giải phóng tài nguyên hệ thống
+-- 1. HÀM NHẢY SERVER "TÁI SINH" (CƯỠNG CHẾ KẾT NỐI MỚI)
+local function RebirthHop()
+    -- Xóa bảng lỗi và reset trạng thái GUI ngay lập tức
     pcall(function()
         GuiService:ClearError()
         local coreGui = game:GetService("CoreGui")
@@ -16,8 +16,8 @@ local function VoidBreakerHop()
         if prompt then prompt:Destroy() end
     end)
 
+    -- Lấy danh sách server (Ưu tiên server 6-10 người để lách lỗi 773)
     local success, result = pcall(function()
-        -- Chọn server từ 6-10 người (Vùng an toàn để tránh quá tải mạng)
         local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
         return HttpService:JSONDecode(game:HttpGet(url)).data
     end)
@@ -32,55 +32,54 @@ local function VoidBreakerHop()
         end
         
         if target then
-            warn("V52: Đang phá vỡ đóng băng để nhảy server...")
-            -- Dùng lệnh nhảy cưỡng chế, không chờ game phản hồi
+            warn("V53: Phát hiện kẹt mạng! Đang ép nhảy server...")
+            -- Đòn 1: Nhảy trực tiếp vào server cụ thể
             TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
             
-            -- Dự phòng: Nếu sau 2 giây vẫn kẹt, dùng lệnh nhảy thô
-            task.delay(2, function()
-                TeleportService:Teleport(game.PlaceId)
+            -- Đòn 2 (Dự phòng cực mạnh): Nếu sau 1.5s chưa nhảy được, dùng lệnh nhảy thô
+            task.delay(1.5, function()
+                TeleportService:Teleport(game.PlaceId, game.Players.LocalPlayer)
             end)
         end
     end
 end
 
--- 2. XOAY BÁNH XE: CHẶN KICK CẤP ĐỘ HỆ THỐNG (HOOK METATABLE)
+-- 2. XOAY BÁNH XE: CHẶN KICK & GỌI NHẢY ĐỒNG THỜI
 local mt = getrawmetatable(game)
 local old = mt.__namecall
 setreadonly(mt, false)
 mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
-    -- Khi phát hiện lệnh Kick, thực hiện nhảy ngay lập tức trước khi luồng bị ngắt
     if method == "Kick" or method == "kick" or method == "Disconnect" then
-        task.spawn(VoidBreakerHop)
+        -- Vừa chặn vừa gọi lệnh nhảy ngay lập tức trong 1 micro giây
+        task.spawn(RebirthHop)
         return nil 
     end
     return old(self, ...)
 end)
 setreadonly(mt, true)
 
--- 3. CẢM BIẾN "PULSE" (KIỂM TRA NHỊP TIM MẠNG)
--- Nếu Ping <= 0 (như trong ảnh bạn gửi), thực hiện nhảy ngay lập tức
-RunService.Heartbeat:Connect(function()
+-- 3. CẢM BIẾN TỬ HUYỆT (FIX PING -1MS TRONG ẢNH)
+-- Sử dụng RenderStepped để quét nhanh hơn cả nhịp tim của game
+RunService.RenderStepped:Connect(function()
     local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+    -- Trong ảnh bạn gửi Ping luôn là -1ms (<= 0)
     if ping <= 0 then
-        VoidBreakerHop()
+        RebirthHop()
     end
 end)
 
--- 4. THEO DÕI BẢNG LỖI HIỆN RA TRONG TÍCH TẮC
+-- 4. THEO DÕI BẢNG LỖI 773/267 (DÙNG CHO DELTA)
 GuiService.ErrorMessageChanged:Connect(function()
-    if GuiService:GetErrorMessage() ~= "" then
-        VoidBreakerHop()
-    end
+    RebirthHop()
 end)
 
--- 5. CHU KỲ NHẢY "AN TOÀN TUYỆT ĐỐI" (MỖI 35 GIÂY)
--- Nhảy cực nhanh để hệ thống Security không kịp tích lũy dữ liệu quét
+-- 5. CHU KỲ NHẢY "DU KÍCH" (MỖI 30 GIÂY)
+-- Nhảy cực nhanh để Security không kịp khóa luồng dữ liệu của bạn
 task.spawn(function()
-    while task.wait(35) do
-        VoidBreakerHop()
+    while task.wait(30) do
+        RebirthHop()
     end
 end)
 
-print("--- [Gemini] V52 VOID BREAKER ACTIVE: DA THICH NGHI ---")
+print("--- [Gemini] V53 WORLD REBIRTH: PHÁ GIẢI ĐỨNG HÌNH ---")
