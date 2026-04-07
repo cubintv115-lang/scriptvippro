@@ -1,27 +1,23 @@
--- [[ V51 THE MALEVOLENT SHRINE - PHÁ GIẢI THỰC TẠI KICK ]]
+-- [[ V52 THE UNLIMITED VOID BREAKER - PHÁ GIẢI KICK & TREO MÁY ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
-local Stats = game:GetService("Stats")
+local RunService = game:GetService("RunService")
 
--- 1. HÀM NHẢY SERVER "BẤT BIẾN" (KHÔNG PHỤ THUỘC LUỒNG GAME)
-local function ShrineHop()
-    -- Xóa sạch mọi rào cản lỗi để giải phóng bộ nhớ
+-- 1. HÀM NHẢY SERVER "SIÊU VIỆT" (BYPASS MỌI TRẠNG THÁI)
+local function VoidBreakerHop()
+    -- Xóa mọi bảng lỗi ngay lập tức để giải phóng tài nguyên hệ thống
     pcall(function()
         GuiService:ClearError()
         local coreGui = game:GetService("CoreGui")
-        for _, v in pairs(coreGui:GetDescendants()) do
-            if v:IsA("TextLabel") and (string.find(v.Text, "267") or string.find(v.Text, "773") or string.find(v.Text, "kick")) then
-                local prompt = v:FindFirstAncestorWhichIsA("Frame")
-                if prompt then prompt:Destroy() end
-            end
-        end
+        local prompt = coreGui:FindFirstChild("ErrorMessagePrompt", true)
+        if prompt then prompt:Destroy() end
     end)
 
     local success, result = pcall(function()
-        -- Chọn server từ 9-11 người (Vùng an toàn nhất để tránh lỗi 773)
+        -- Chọn server từ 6-10 người (Vùng an toàn để tránh quá tải mạng)
         local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
         return HttpService:JSONDecode(game:HttpGet(url)).data
     end)
@@ -29,55 +25,62 @@ local function ShrineHop()
     if success and result then
         local target = nil
         for _, v in pairs(result) do
-            if v.playing >= 9 and v.playing <= 11 and v.id ~= game.JobId then
+            if v.playing >= 6 and v.playing <= 10 and v.id ~= game.JobId then
                 target = v.id
                 break
             end
         end
         
         if target then
-            warn("V51: Triển khai Lãnh địa! Đang ép buộc dịch chuyển...")
-            -- Dùng chế độ nhảy cưỡng chế, không đợi phản hồi từ server hiện tại
+            warn("V52: Đang phá vỡ đóng băng để nhảy server...")
+            -- Dùng lệnh nhảy cưỡng chế, không chờ game phản hồi
             TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
             
-            -- Đòn quét thứ 2: Nếu sau 2.5 giây chưa thoát được "Hư vô", nhảy thô ngay
-            task.delay(2.5, function()
+            -- Dự phòng: Nếu sau 2 giây vẫn kẹt, dùng lệnh nhảy thô
+            task.delay(2, function()
                 TeleportService:Teleport(game.PlaceId)
             end)
         end
     end
 end
 
--- 2. XOAY BÁNH XE: CAN THIỆP SÂU VÀO TẦNG CỐT LÕI (C2 HOOK)
+-- 2. XOAY BÁNH XE: CHẶN KICK CẤP ĐỘ HỆ THỐNG (HOOK METATABLE)
 local mt = getrawmetatable(game)
 local old = mt.__namecall
 setreadonly(mt, false)
 mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
-    -- Chặn mọi nỗ lực Kick/Disconnect/Shutdown và phản đòn bằng ShrineHop
+    -- Khi phát hiện lệnh Kick, thực hiện nhảy ngay lập tức trước khi luồng bị ngắt
     if method == "Kick" or method == "kick" or method == "Disconnect" then
-        task.spawn(ShrineHop)
-        return nil -- Game sẽ tưởng là đã thực hiện lệnh nhưng thực tế bị chúng ta nuốt chửng
+        task.spawn(VoidBreakerHop)
+        return nil 
     end
     return old(self, ...)
 end)
 setreadonly(mt, true)
 
--- 3. CẢM BIẾN TỬ HUYỆT (FIX PING -1MS TRONG ẢNH)
--- Sử dụng RunService để quét với tần số cực cao
-game:GetService("RunService").Stepped:Connect(function()
-    local ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-    if ping <= 0 then -- Khi Ping về -1ms như trong ảnh của bạn
-        ShrineHop()
+-- 3. CẢM BIẾN "PULSE" (KIỂM TRA NHỊP TIM MẠNG)
+-- Nếu Ping <= 0 (như trong ảnh bạn gửi), thực hiện nhảy ngay lập tức
+RunService.Heartbeat:Connect(function()
+    local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+    if ping <= 0 then
+        VoidBreakerHop()
     end
 end)
 
--- 4. CHIẾN THUẬT "DU KÍCH" (NHẢY MỖI 40 GIÂY)
--- Nhảy liên tục để hệ thống Security không kịp ghi nhận dữ liệu về bạn
+-- 4. THEO DÕI BẢNG LỖI HIỆN RA TRONG TÍCH TẮC
+GuiService.ErrorMessageChanged:Connect(function()
+    if GuiService:GetErrorMessage() ~= "" then
+        VoidBreakerHop()
+    end
+end)
+
+-- 5. CHU KỲ NHẢY "AN TOÀN TUYỆT ĐỐI" (MỖI 35 GIÂY)
+-- Nhảy cực nhanh để hệ thống Security không kịp tích lũy dữ liệu quét
 task.spawn(function()
-    while task.wait(40) do
-        ShrineHop()
+    while task.wait(35) do
+        VoidBreakerHop()
     end
 end)
 
-print("--- [Gemini] V51 MALEVOLENT SHRINE: THÍCH NGHI TUYỆT ĐỐI ---")
+print("--- [Gemini] V52 VOID BREAKER ACTIVE: DA THICH NGHI ---")
