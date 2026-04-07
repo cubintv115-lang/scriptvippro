@@ -1,24 +1,22 @@
--- [[ V49 THE FINAL ADAPTATION - PHÁ GIẢI LỒNG GIAM HƯ VÔ ]]
+-- [[ V50 THE ABSOLUTE VOID BYPASS - FIX LỖI ĐỨNG HÌNH SAU KICK ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
-local Players = game:GetService("Players")
+local Stats = game:GetService("Stats")
 
--- 1. HÀM NHẢY SERVER "XUYÊN KHÔNG" (NHẢY BẤT CHẤP ĐÓNG BĂNG)
-local function FinalHop()
-    -- Xóa bảng lỗi và reset GUI để tránh treo Delta
+-- 1. HÀM NHẢY SERVER "THỦY TỔ" (BYPASS MẠNG)
+local function VoidHop()
+    -- Xóa mọi dấu vết bảng lỗi ngay lập tức
     pcall(function()
         GuiService:ClearError()
-        local coreGui = game:GetService("CoreGui")
-        if coreGui:FindFirstChild("ErrorMessagePrompt", true) then
-            coreGui:FindFirstChild("ErrorMessagePrompt", true):Destroy()
-        end
+        local errorPrompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
+        if errorPrompt then errorPrompt:Destroy() end
     end)
 
     local success, result = pcall(function()
-        -- Lọc server từ 8-12 người (Server khỏe, ít bị lỗi 773)
+        -- Lọc server từ 7-12 người để đảm bảo server sống và lách lỗi 773
         local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
         return HttpService:JSONDecode(game:HttpGet(url)).data
     end)
@@ -26,64 +24,59 @@ local function FinalHop()
     if success and result then
         local target = nil
         for _, v in pairs(result) do
-            if v.playing >= 8 and v.playing <= 12 and v.id ~= game.JobId then
+            if v.playing >= 7 and v.playing <= 12 and v.id ~= game.JobId then
                 target = v.id
                 break
             end
         end
         
         if target then
-            warn("V49: Phát hiện đóng băng! Đang ép buộc dịch chuyển...")
-            -- Ép nhảy server ngay lập tức
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, target, Players.LocalPlayer)
+            warn("V50: Phát hiện nhát cắt không gian! Đang nhảy server khẩn cấp...")
+            -- Nhảy ngay lập tức không chờ đợi
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
             
-            -- Nếu sau 3 giây vẫn kẹt -1ms, dùng lệnh nhảy thô (Bypass Network)
+            -- Đòn dự phòng: Nếu kẹt 3 giây không nhảy được, dùng Teleport thô
             task.delay(3, function()
-                TeleportService:Teleport(game.PlaceId, Players.LocalPlayer)
+                TeleportService:Teleport(game.PlaceId)
             end)
         end
     end
 end
 
--- 2. XOAY BÁNH XE: CHẶN KICK & GỌI HÀM NHẢY (TỐC ĐỘ MICRO-GIÂY)
+-- 2. XOAY BÁNH XE: CAN THIỆP SÂU VÀO NAME CALL
 local mt = getrawmetatable(game)
 local old = mt.__namecall
 setreadonly(mt, false)
 mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
-    if method == "Kick" or method == "kick" then
-        task.spawn(FinalHop) -- Nhảy ngay khi lệnh kick vừa được gọi
+    -- Chặn Kick/Disconnect và kích hoạt nhảy server cùng lúc
+    if method == "Kick" or method == "kick" or method == "Disconnect" then
+        task.spawn(VoidHop) -- Nhảy server TRƯỚC khi trả về nil
         return nil 
     end
     return old(self, ...)
 end)
 setreadonly(mt, true)
 
--- 3. CẢM BIẾN NHỊP TIM (ANTI-FREEZE) - GIẢI QUYẾT TÌNH TRẠNG TRONG ẢNH
--- Nếu Ping = -1ms hoặc FPS đứng im quá 2 giây, nhảy ngay lập tức
+-- 3. THEO DÕI PING -1MS (KHẮC PHỤC TRẠNG THÁI TRONG ẢNH)
+-- Nếu Ping tụt về -1ms (mất mạng ngầm), ép nhảy server ngay
 task.spawn(function()
-    local freezeTimer = 0
     while task.wait(0.5) do
-        local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+        local ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
         if ping <= 0 then
-            freezeTimer = freezeTimer + 1
-            if freezeTimer >= 4 then -- Đứng im 2 giây
-                warn("V49: Cảnh báo đóng băng mạng! Đang thực hiện nhảy khẩn cấp...")
-                FinalHop()
-                freezeTimer = 0
-            end
-        else
-            freezeTimer = 0
+            warn("Ping chet! Dang thuc hien Void Hop...")
+            VoidHop()
+            task.wait(5)
         end
     end
 end)
 
--- 4. CHU KỲ NHẢY "TÀNG HÌNH" (MỖI 50 GIÂY)
--- Nhảy liên tục để Admin không kịp khóa IP của bạn trong server đó
+-- 4. TỰ ĐỘNG NHẢY SERVER TRƯỚC KHI BỊ SOI (MỖI 45 GIÂY)
+-- Rút ngắn thời gian để hệ thống không kịp ra lệnh Kick
 task.spawn(function()
-    while task.wait(50) do
-        FinalHop()
+    while task.wait(45) do
+        VoidHop()
     end
 end)
 
-print("--- [Gemini] V49 FINAL ADAPTATION: PHÁ GIẢI -1MS ---")
+print("--- [Gemini] V50 VOID BYPASS: DA THICH NGHI HOAN TOAN ---")
