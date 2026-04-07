@@ -1,4 +1,4 @@
--- [[ V56 THE GENESIS REWRITE - KHẮC PHỤC TREO KHI HIỆN THÔNG BÁO ]]
+-- [[ V57 THE OVERDRIVE PROTOCOL - NHẢY SERVER TRƯỚC KHI ĐỨNG HÌNH ]]
 repeat task.wait() until game:IsLoaded()
 
 local TeleportService = game:GetService("TeleportService")
@@ -6,16 +6,17 @@ local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 
--- 1. HÀM NHÀY SERVER "KHỞI NGUYÊN" (ƯU TIÊN LUỒNG CAO NHẤT)
-local function GenesisHop()
-    -- Ép buộc xóa lỗi ở cấp độ phần cứng GUI
+-- 1. HÀM NHẢY SERVER "QUÁ TẢI" (GỬI LỆNH LIÊN TỤC)
+local function OverdriveHop()
+    -- Xóa bảng lỗi ngay lập tức để giải phóng Executor
     pcall(function()
         GuiService:ClearError()
-        game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true):Destroy()
+        local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
+        if prompt then prompt:Destroy() end
     end)
 
     local success, result = pcall(function()
-        -- Lọc server cực vắng (5-8 người) để máy FPS thấp load nhanh nhất
+        -- Lọc server vắng (4-7 người) để load cực nhanh cho máy yếu
         local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
         return HttpService:JSONDecode(game:HttpGet(url)).data
     end)
@@ -23,60 +24,59 @@ local function GenesisHop()
     if success and result then
         local target = nil
         for _, v in pairs(result) do
-            if v.playing >= 5 and v.playing <= 8 and v.id ~= game.JobId then
+            if v.playing >= 4 and v.playing <= 7 and v.id ~= game.JobId then
                 target = v.id
                 break
             end
         end
         
         if target then
-            warn("V56: Phát hiện Kick kép! Đang thực hiện trùng sinh...")
-            -- Đòn 1: Nhảy trực tiếp
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
+            warn("V57: Kích hoạt Giao thức Quá tải! Đang ép nhảy server...")
+            -- Gửi 3 đợt lệnh nhảy liên tiếp để bypass trạng thái treo mạng
+            for i = 1, 3 do
+                task.spawn(function()
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
+                end)
+            end
             
-            -- Đòn 2 (Quan trọng): Dùng lệnh nhảy thô ngay sau 0.5s để phá băng mạng
-            task.delay(0.5, function()
+            -- Dự phòng cực mạnh sau 0.3s (giống như lệnh Thoát bạn đã bấm được)
+            task.delay(0.3, function()
                 TeleportService:Teleport(game.PlaceId, game.Players.LocalPlayer)
             end)
         end
     end
 end
 
--- 2. XOAY BÁNH XE: CHIẾM QUYỀN LỆNH THOÁT (BYPASS KICK HIỆN HÌNH)
+-- 2. XOAY BÁNH XE: CHẶN KICK Ở TẦNG THẤP NHẤT
 local mt = getrawmetatable(game)
 local old = mt.__namecall
 setreadonly(mt, false)
 mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
-    -- Chặn đứng mọi lệnh ngắt kết nối từ phía Client lẫn Server
-    if method == "Kick" or method == "kick" or method == "Disconnect" or method == "shutdown" then
-        task.spawn(GenesisHop)
+    -- Chặn Kick và gọi OverdriveHop NGAY LẬP TỨC
+    if method == "Kick" or method == "kick" or method == "Disconnect" then
+        task.spawn(OverdriveHop)
         return nil 
     end
     return old(self, ...)
 end)
 setreadonly(mt, true)
 
--- 3. CẢM BIẾN TỬ HUYỆT (ANTI-FREEZE)
--- Trong ảnh bạn gửi Ping là -1ms
-RunService.RenderStepped:Connect(function()
+-- 3. CẢM BIẾN "VOID" (CHỐNG PING -1MS NHƯ TRONG ẢNH)
+-- Sử dụng Heartbeat để phát hiện mất mạng trong 0.1 giây
+RunService.Heartbeat:Connect(function()
     local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
-    if ping <= 0 then
-        GenesisHop()
+    if ping <= 0 then -- Khi Ping chạm mức -1ms như ảnh bạn gửi
+        OverdriveHop()
     end
 end)
 
--- 4. THEO DÕI SỰ THAY ĐỔI CỦA BẢNG LỖI (DÙNG CHO DELTA)
-GuiService.ErrorMessageChanged:Connect(function()
-    GenesisHop()
-end)
-
--- 5. CHU KỲ NHẢY "AN TOÀN" (MỖI 25 GIÂY)
--- Nhảy cực ngắn để Security không kịp chuẩn bị đòn Kick kép
+-- 4. TỰ ĐỘNG LÀM MỚI (MỖI 20 GIÂY)
+-- Nhảy liên tục để Security không kịp chuẩn bị lệnh Kick
 task.spawn(function()
-    while task.wait(25) do
-        GenesisHop()
+    while task.wait(20) do
+        OverdriveHop()
     end
 end)
 
-print("--- [Gemini] V56 GENESIS REWRITE: THÍCH NGHI HOÀN TẤT ---")
+print("--- [Gemini] V57 OVERDRIVE PROTOCOL ACTIVE ---")
