@@ -1,88 +1,146 @@
--- [[ V59 THE VOID SANCTUM - FIX LỖI 773 & ĐÓNG BĂNG MẠNG ]]
-repeat task.wait() until game:IsLoaded()
+-- Blox Fruits INSTANT Anti-Kick Hop
+-- HOP NGAY LẬP TỨC khi phát hiện kick message!
 
+local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
-local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 
--- 1. HÀM NHẢY SERVER "TẨY TRẮNG" (BYPASS LỖI 773)
-local function SanctumHop()
-    -- Xóa sạch bảng lỗi 773/267 để lách bộ lọc của Roblox
-    pcall(function()
-        GuiService:ClearError()
-        local prompt = game:GetService("CoreGui"):FindFirstChild("ErrorMessagePrompt", true)
-        if prompt then prompt:Destroy() end
-    end)
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
-    local success, result = pcall(function()
-        -- Lọc server từ 4-8 người (Tránh server quá vắng bị lỗi 773 cao hơn)
-        local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
-        return HttpService:JSONDecode(game:HttpGet(url)).data
-    end)
+getgenv().InstantHop = {
+    Enabled = true,
+    InstantHop = true
+}
 
-    if success and result then
-        local target = nil
-        -- Thuật toán chọn server ngẫu nhiên trong danh sách an toàn để tránh bị "soi" IP
-        local safeServers = {}
-        for _, v in pairs(result) do
-            if v.playing >= 4 and v.playing <= 8 and v.id ~= game.JobId then
-                table.insert(safeServers, v.id)
-            end
-        end
-        target = safeServers[math.random(1, #safeServers)]
+-- Danh sách KICK MESSAGES (cập nhật mới nhất)
+local KICK_MESSAGES = {
+    "You have been kicked",
+    "Kicked from this game", 
+    "Kicked from server",
+    "Anti-Cheat detected",
+    "You are using exploits",
+    "Blox Fruits Anti-Cheat",
+    "Server hop detected",
+    "Unauthorized script",
+    "Exploit detected",
+    "You have been banned",
+    "Kick",
+    "kicked"
+}
+
+-- 🔥 FUNCTION HOP SIÊU NHANH
+local function INSTANT_HOP()
+    spawn(function()
+        game.StarterGui:SetCore("SendNotification", {
+            Title = "🚀 INSTANT HOP";
+            Text = "KICK detected! Hopping NOW...";
+            Duration = 1
+        })
         
-        if target then
-            warn("V59: Phát hiện lỗi 773/267! Đang tẩy trắng để nhảy server...")
-            -- Đòn 1: Ép nhảy bằng lệnh thô (như nút Thoát bạn bấm được)
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, target, game.Players.LocalPlayer)
-            
-            -- Đòn 2: Nếu sau 0.5s vẫn kẹt màn hình lỗi, nhảy về server ngẫu nhiên khác
-            task.delay(0.5, function()
-                TeleportService:Teleport(game.PlaceId)
-            end)
-        end
-    end
+        wait(0.1) -- Delay siêu nhỏ
+        
+        -- Hop ngay lập tức
+        TeleportService:Teleport(game.PlaceId, player)
+    end)
 end
 
--- 2. XOAY BÁNH XE: CAN THIỆP SÂU VÀO LUỒNG THOÁT
+-- 🕵️ CHECK KICK MESSAGE SIÊU NHANH (0.1s)
+spawn(function()
+    while getgenv().InstantHop.Enabled do
+        pcall(function()
+            -- Scan tất cả TextLabel/TextButton
+            for _, obj in pairs(playerGui:GetDescendants()) do
+                if (obj:IsA("TextLabel") or obj:IsA("TextButton")) and obj.Text then
+                    local text = string.lower(obj.Text)
+                    
+                    -- Check từng kick message
+                    for _, kickMsg in pairs(KICK_MESSAGES) do
+                        if text:find(string.lower(kickMsg)) then
+                            print("🔥 KICK MESSAGE DETECTED:", obj.Text)
+                            INSTANT_HOP()
+                            return -- Thoát ngay lập tức
+                        end
+                    end
+                end
+            end
+        end)
+        wait(0.1) -- Scan cực nhanh 10 lần/giây
+    end
+end)
+
+-- 🛡️ BLOCK KICK FUNCTION (Backup)
 local mt = getrawmetatable(game)
-local old = mt.__namecall
+local oldNamecall = mt.__namecall
+
 setreadonly(mt, false)
 mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
-    -- Chặn Kick/Disconnect/TeleportError
-    if method == "Kick" or method == "kick" or method == "Disconnect" then
-        task.spawn(SanctumHop)
-        return nil 
+    local args = {...}
+    
+    if getgenv().InstantHop.Enabled and method == "Kick" then
+        print("🛡️ BLOCKED KICK:", args[1])
+        INSTANT_HOP()
+        return
     end
-    return old(self, ...)
+    
+    return oldNamecall(self, ...)
 end)
 setreadonly(mt, true)
 
--- 3. CẢM BIẾN TỬ HUYỆT (FIX PING -1MS TRONG ẢNH)
-RunService.Heartbeat:Connect(function()
-    local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
-    -- Nếu Ping chết hoặc FPS quá thấp (dấu hiệu đóng băng mạng)
-    if ping <= 0 then
-        SanctumHop()
+-- 📱 GUI SIÊU NHỎ (F1 toggle)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "InstantHopGUI"
+ScreenGui.Parent = playerGui
+
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 180, 0, 40)
+Frame.Position = UDim2.new(0, 10, 0, 10)
+Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+Frame.BorderSizePixel = 0
+Frame.Active = true
+Frame.Draggable = true
+Frame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0.5, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "🚀 Instant Hop"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextScaled = true
+Title.Font = Enum.Font.GothamBold
+Title.Parent = Frame
+
+local Toggle = Instance.new("TextButton")
+Toggle.Size = UDim2.new(1, 0, 0.5, 0)
+Toggle.Position = UDim2.new(0, 0, 0.5, 0)
+Toggle.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+Toggle.Text = "✅ ACTIVE"
+Toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+Toggle.TextScaled = true
+Toggle.Font = Enum.Font.GothamBold
+Toggle.Parent = Frame
+
+Toggle.MouseButton1Click:Connect(function()
+    getgenv().InstantHop.Enabled = not getgenv().InstantHop.Enabled
+    Toggle.Text = getgenv().InstantHop.Enabled and "✅ ACTIVE" or "❌ OFF"
+    Toggle.BackgroundColor3 = getgenv().InstantHop.Enabled and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+end)
+
+-- F1 HOTKEY
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.F1 then
+        Toggle.MouseButton1Click:Fire()
     end
 end)
 
--- 4. BẮT LỖI 773 TỨC THÌ (KHI VỪA HIỆN THÔNG BÁO)
-GuiService.ErrorMessageChanged:Connect(function()
-    local msg = GuiService:GetErrorMessage()
-    if msg ~= "" then
-        warn("V59: Phát hiện lỗi: " .. msg .. ". Đang xử lý...")
-        SanctumHop()
-    end
-end)
+print("✅ INSTANT HOP LOADED!")
+print("⚡ Scan 10 lần/giây - Hop NGAY LẬP TỨC!")
+print("📱 F1 toggle | GUI góc trên trái")
 
--- 5. CHU KỲ NHẢY "TÀNG HÌNH" (MỖI 20 GIÂY)
-task.spawn(function()
-    while task.wait(20) do
-        SanctumHop()
-    end
-end)
-
-print("--- [Gemini] V59 VOID SANCTUM: FIX 773 & FREEZE ---")
+game.StarterGui:SetCore("SendNotification", {
+    Title = "🚀 Instant Hop";
+    Text = "Hop NGAY khi có kick! F1 toggle";
+    Duration = 4
+})
